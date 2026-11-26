@@ -1,0 +1,15 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "CoFH - Don't Be A Jerk (Learn, Don't Steal)"
+
+[[mods]]
+modId = "redstone_arsenal_tests"
+version = "1"
+displayName = "Redstone Arsenal Tests"
+
+[[dependencies.redstone_arsenal_tests]]
+modId = "redstone_arsenal"
+type = "required"
+versionRange = "[8.0.1,)"
+ordering = "AFTER"
+side = "BOTH"

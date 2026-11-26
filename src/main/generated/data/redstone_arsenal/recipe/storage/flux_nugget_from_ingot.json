@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "redstone_arsenal:flux_ingot"
+    }
+  ],
+  "result": {
+    "count": 9,
+    "id": "redstone_arsenal:flux_nugget"
+  }
+}
