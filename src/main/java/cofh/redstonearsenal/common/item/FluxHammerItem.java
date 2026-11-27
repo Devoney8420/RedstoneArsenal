@@ -1,5 +1,7 @@
 package cofh.redstonearsenal.common.item;
 
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.entity.EquipmentSlotGroup;
 import cofh.core.common.config.CoreClientConfig;
 import cofh.core.common.item.HammerItem;
 import cofh.core.util.ProxyUtils;
@@ -8,9 +10,7 @@ import cofh.lib.api.capability.IAreaEffectHandler;
 import cofh.lib.common.energy.EnergyContainerItemWrapper;
 import cofh.lib.util.Utils;
 import cofh.redstonearsenal.common.entity.FluxHammerShockwave;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multimap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
@@ -20,9 +20,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
@@ -33,13 +31,12 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.ToolAction;
+import net.neoforged.neoforge.common.ItemAbility;
 
 import javax.annotation.Nullable;
 import java.util.List;
 
 import static cofh.core.util.references.EnsorcIDs.ID_EXCAVATING;
-import static cofh.lib.util.Constants.UUID_WEAPON_KNOCKBACK;
 import static cofh.lib.util.Utils.getEnchantment;
 import static cofh.lib.util.Utils.getItemEnchantmentLevel;
 import static cofh.lib.util.constants.ModIds.ID_ENSORCELLATION;
@@ -60,22 +57,22 @@ public class FluxHammerItem extends HammerItem implements IMultiModeFluxItem {
 
         super(tier, attackDamageIn, attackSpeedIn, builder);
 
-        this.damage = getAttackDamage();
+        this.damage = attackDamageIn + tier.getAttackDamageBonus();
         this.attackSpeed = attackSpeedIn;
 
         this.maxEnergy = energy;
         this.extract = xfer;
         this.receive = xfer;
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -93,7 +90,7 @@ public class FluxHammerItem extends HammerItem implements IMultiModeFluxItem {
         Player player = context.getPlayer();
         ItemStack stack = context.getItemInHand();
         int energy = getEnergyPerUse(true) * 2;
-        if (player == null || !player.onGround() || !isEmpowered(stack) || !(hasEnergy(stack, energy) || player.abilities.instabuild)) {
+        if (player == null || !player.onGround() || !isEmpowered(stack) || !(hasEnergy(stack, energy) || player.getAbilities().instabuild)) {
             return InteractionResult.FAIL;
         }
         Level world = context.getLevel();
@@ -102,7 +99,7 @@ public class FluxHammerItem extends HammerItem implements IMultiModeFluxItem {
         if (world.isClientSide) {
             world.playSound(player, pos, state.getSoundType(world, pos, player).getBreakSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
         } else if (world.addFreshEntity(new FluxHammerShockwave(world, Vec3.atBottomCenterOf(pos.above()), player))) {
-            useEnergy(stack, energy, player.abilities.instabuild);
+            useEnergy(stack, energy, player.getAbilities().instabuild);
             player.getCooldowns().addCooldown(this, getSlamCooldown(stack));
         }
         return InteractionResult.SUCCESS;
@@ -114,7 +111,7 @@ public class FluxHammerItem extends HammerItem implements IMultiModeFluxItem {
     }
 
     @Override
-    public boolean canPerformAction(ItemStack stack, ToolAction action) {
+    public boolean canPerformAction(ItemStack stack, ItemAbility action) {
 
         return hasEnergy(stack, false) && super.canPerformAction(stack, action);
     }
@@ -150,7 +147,7 @@ public class FluxHammerItem extends HammerItem implements IMultiModeFluxItem {
     @Override
     public float getDestroySpeed(ItemStack stack, BlockState state) {
 
-        return isCorrectToolForDrops(stack, state) && !isEmpowered(stack) ? speed : 1.0F;
+        return isCorrectToolForDrops(stack, state) && !isEmpowered(stack) ? getTier().getSpeed() : 1.0F;
     }
 
     @Override
@@ -160,15 +157,13 @@ public class FluxHammerItem extends HammerItem implements IMultiModeFluxItem {
     }
 
     @Override
-    public Multimap<Attribute, AttributeModifier> getAttributeModifiers(EquipmentSlot slot, ItemStack stack) {
+    public ItemAttributeModifiers getDefaultAttributeModifiers(ItemStack stack) {
 
-        Multimap<Attribute, AttributeModifier> multimap = HashMultimap.create();
-        if (slot == EquipmentSlot.MAINHAND) {
-            multimap.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_UUID, "Tool modifier", getAttackDamage(stack), AttributeModifier.Operation.ADDITION));
-            multimap.put(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_UUID, "Tool modifier", getAttackSpeed(stack), AttributeModifier.Operation.ADDITION));
-            multimap.put(Attributes.ATTACK_KNOCKBACK, new AttributeModifier(UUID_WEAPON_KNOCKBACK, "Tool modifier", getKnockbackModifier(stack), AttributeModifier.Operation.ADDITION));
-        }
-        return multimap;
+        return ItemAttributeModifiers.builder()
+                .add(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_ID, getAttackDamage(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .add(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_ID, getAttackSpeed(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .add(Attributes.ATTACK_KNOCKBACK, new AttributeModifier(ResourceLocation.fromNamespaceAndPath("redstone_arsenal", "weapon_knockback"), getKnockbackModifier(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .build();
     }
 
     protected float getAttackDamage(ItemStack stack) {

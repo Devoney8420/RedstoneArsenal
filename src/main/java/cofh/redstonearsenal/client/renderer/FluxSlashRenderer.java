@@ -14,15 +14,13 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
-import org.joml.Matrix3f;
-import org.joml.Matrix4f;
 
 import static cofh.lib.util.constants.ModIds.ID_REDSTONE_ARSENAL;
 import static net.minecraft.client.renderer.RenderStateShard.*;
 
 public class FluxSlashRenderer extends EntityRenderer<FluxSlash> {
 
-    private static final ResourceLocation TEXTURE = new ResourceLocation(ID_REDSTONE_ARSENAL + ":textures/entity/flux_slash.png");
+    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "textures/entity/flux_slash.png");
     private static final RenderType RENDER_TYPE = RenderType.create("flux_projectile",
             DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 256, true, true,
             RenderType.CompositeState.builder().setTextureState(new RenderStateShard.TextureStateShard(TEXTURE, false, false))
@@ -41,20 +39,18 @@ public class FluxSlashRenderer extends EntityRenderer<FluxSlash> {
 
         matrixStackIn.pushPose();
 
-        matrixStackIn.mulPose(Axis.YP.rotationDegrees(Mth.lerp(partialTicks, entity.yRotO, entity.yRot) - 90));
-        matrixStackIn.mulPose(Axis.ZP.rotationDegrees(Mth.lerp(partialTicks, entity.xRotO, entity.xRot) + 10));
+        matrixStackIn.mulPose(Axis.YP.rotationDegrees(Mth.lerp(partialTicks, entity.yRotO, entity.getYRot()) - 90));
+        matrixStackIn.mulPose(Axis.ZP.rotationDegrees(Mth.lerp(partialTicks, entity.xRotO, entity.getXRot()) + 10));
         matrixStackIn.mulPose(Axis.XP.rotationDegrees(entity.zRot));
         matrixStackIn.scale(0.6F, 0.6F, 1.8F);
         PoseStack.Pose matrixStackEntry = matrixStackIn.last();
-        Matrix4f pose = matrixStackEntry.pose();
-        Matrix3f normal = matrixStackEntry.normal();
         VertexConsumer builder = buffer.getBuffer(RENDER_TYPE);
 
         packedLight = 0x00F000F0;
-        this.vertex(pose, normal, builder, 1, 0, 1, 1, 0, 0, 1, 0, packedLight);
-        this.vertex(pose, normal, builder, 1, 0, -1, 0, 0, 0, 1, 0, packedLight);
-        this.vertex(pose, normal, builder, -1, 0, -1, 0, 1, 0, 1, 0, packedLight);
-        this.vertex(pose, normal, builder, -1, 0, 1, 1, 1, 0, 1, 0, packedLight);
+        this.vertex(matrixStackEntry, builder, 1, 0, 1, 1, 0, 0, 1, 0, packedLight);
+        this.vertex(matrixStackEntry, builder, 1, 0, -1, 0, 0, 0, 1, 0, packedLight);
+        this.vertex(matrixStackEntry, builder, -1, 0, -1, 0, 1, 0, 1, 0, packedLight);
+        this.vertex(matrixStackEntry, builder, -1, 0, 1, 1, 1, 0, 1, 0, packedLight);
 
         matrixStackIn.popPose();
         super.render(entity, entityYaw, partialTicks, matrixStackIn, buffer, packedLight);
@@ -66,9 +62,9 @@ public class FluxSlashRenderer extends EntityRenderer<FluxSlash> {
         return TEXTURE;
     }
 
-    public void vertex(Matrix4f pose, Matrix3f normal, VertexConsumer builder, float x, float y, float z, float u, float v, int nx, int nz, int ny, int packedLight) {
+    public void vertex(PoseStack.Pose pose, VertexConsumer builder, float x, float y, float z, float u, float v, int nx, int nz, int ny, int packedLight) {
 
-        builder.vertex(pose, x, y, z).color(255, 255, 255, 200).uv(u, v).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(packedLight).normal(normal, nx, ny, nz).endVertex();
+        builder.addVertex(pose, x, y, z).setColor(255, 255, 255, 200).setUv(u, v).setOverlay(OverlayTexture.NO_OVERLAY).setLight(packedLight).setNormal(pose, nx, ny, nz);
     }
 
 }

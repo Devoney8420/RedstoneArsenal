@@ -16,13 +16,13 @@ import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.InputEvent.InteractionKeyMappingTriggered;
-import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 import static cofh.lib.util.constants.ModIds.ID_REDSTONE_ARSENAL;
 
-@Mod.EventBusSubscriber (value = Dist.CLIENT, modid = ID_REDSTONE_ARSENAL)
+@EventBusSubscriber(value = Dist.CLIENT, modid = ID_REDSTONE_ARSENAL)
 public class RSAClientEvents {
 
     @SubscribeEvent (priority = EventPriority.LOWEST)
@@ -46,7 +46,7 @@ public class RSAClientEvents {
         }
         // Flux Trident
         if (item instanceof FluxTridentItem trident) {
-            if (trident.isEmpowered(stack) && trident.hasEnergy(stack, true) && trident.startPlunge(player)) {
+            if (trident.isEmpowered(stack) && trident.hasEnergy(stack, true) && trident.startPlunge(player, stack)) {
                 event.setCanceled(true);
                 event.setSwingHand(false);
                 ItemLeftClickPacket.sendToServer();
@@ -67,12 +67,12 @@ public class RSAClientEvents {
     }
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
+    public static void onClientTick(ClientTickEvent.Post event) {
 
         // Flux Shielding
-        if (event.phase == TickEvent.Phase.END && ProxyUtils.isClient()) {
+        if (ProxyUtils.isClient()) {
             LocalPlayer player = Minecraft.getInstance().player;
-            if (player != null && (player.level.getGameTime() & 7) == 0) {
+            if (player != null && (player.level().getGameTime() & 7) == 0) {
                 FluxShieldingHelper.updateHUD(player);
             }
         }

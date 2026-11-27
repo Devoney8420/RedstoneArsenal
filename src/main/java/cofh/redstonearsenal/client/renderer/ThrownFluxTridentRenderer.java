@@ -18,8 +18,8 @@ import static cofh.lib.util.constants.ModIds.ID_REDSTONE_ARSENAL;
 
 public class ThrownFluxTridentRenderer extends EntityRenderer<ThrownFluxTrident> {
 
-    private static final ResourceLocation CHARGED = new ResourceLocation(ID_REDSTONE_ARSENAL + ":textures/entity/flux_trident.png");
-    // private static final ResourceLocation EMPOWERED = new ResourceLocation(ID_REDSTONE_ARSENAL + ":textures/entity/flux_trident.png");
+    private static final ResourceLocation CHARGED = ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "textures/entity/flux_trident.png");
+    // private static final ResourceLocation EMPOWERED = ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "textures/entity/flux_trident.png");
     private final TridentModel model;
 
     public ThrownFluxTridentRenderer(EntityRendererProvider.Context ctx) {
@@ -34,7 +34,7 @@ public class ThrownFluxTridentRenderer extends EntityRenderer<ThrownFluxTrident>
         poseStack.mulPose(Axis.YP.rotationDegrees(Mth.lerp(p_116113_, p_116111_.yRotO, p_116111_.getYRot()) - 90.0F));
         poseStack.mulPose(Axis.ZP.rotationDegrees(Mth.lerp(p_116113_, p_116111_.xRotO, p_116111_.getXRot()) + 90.0F));
         VertexConsumer vertexconsumer = ItemRenderer.getFoilBufferDirect(p_116115_, this.model.renderType(this.getTextureLocation(p_116111_)), false, p_116111_.isFoil());
-        this.model.renderToBuffer(poseStack, vertexconsumer, p_116116_, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
+        this.model.renderToBuffer(poseStack, vertexconsumer, p_116116_, OverlayTexture.NO_OVERLAY);
         poseStack.popPose();
         super.render(p_116111_, p_116112_, p_116113_, poseStack, p_116115_, p_116116_);
     }

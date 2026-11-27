@@ -35,9 +35,9 @@ public interface IMultiModeFluxItem extends IFluxItem, IMultiModeItem {
     default void onModeChange(Player player, ItemStack stack) {
 
         if (isEmpowered(stack)) {
-            player.level.playSound(null, player.blockPosition(), SOUND_EMPOWER.get(), SoundSource.PLAYERS, 0.4F, 1.0F);
+            player.level().playSound(null, player.blockPosition(), SOUND_EMPOWER.get(), SoundSource.PLAYERS, 0.4F, 1.0F);
         } else {
-            player.level.playSound(null, player.blockPosition(), SOUND_QUELL.get(), SoundSource.PLAYERS, 0.2F, 0.6F);
+            player.level().playSound(null, player.blockPosition(), SOUND_QUELL.get(), SoundSource.PLAYERS, 0.2F, 0.6F);
         }
         ProxyUtils.setOverlayMessage(player, Component.translatable("info.redstone_arsenal.mode." + getMode(stack)));
     }

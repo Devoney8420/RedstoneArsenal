@@ -1,11 +1,11 @@
 package cofh.redstonearsenal.common.item;
 
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.entity.EquipmentSlotGroup;
 import cofh.core.common.config.CoreClientConfig;
 import cofh.core.util.ProxyUtils;
 import cofh.lib.common.item.PickaxeItemCoFH;
 import cofh.lib.util.Utils;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
@@ -17,9 +17,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
@@ -29,7 +27,7 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.common.ToolAction;
+import net.neoforged.neoforge.common.ItemAbility;
 
 import javax.annotation.Nullable;
 import java.util.List;
@@ -53,22 +51,22 @@ public class FluxPickaxeItem extends PickaxeItemCoFH implements IMultiModeFluxIt
 
         super(tier, attackDamageIn, attackSpeedIn, builder);
 
-        this.damage = getAttackDamage();
+        this.damage = attackDamageIn + tier.getAttackDamageBonus();
         this.attackSpeed = attackSpeedIn;
 
         this.maxEnergy = energy;
         this.extract = xfer;
         this.receive = xfer;
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -81,7 +79,7 @@ public class FluxPickaxeItem extends PickaxeItemCoFH implements IMultiModeFluxIt
     }
 
     @Override
-    public boolean canPerformAction(ItemStack stack, ToolAction action) {
+    public boolean canPerformAction(ItemStack stack, ItemAbility action) {
 
         return hasEnergy(stack, false) && super.canPerformAction(stack, action);
     }
@@ -111,18 +109,16 @@ public class FluxPickaxeItem extends PickaxeItemCoFH implements IMultiModeFluxIt
     @Override
     public float getDestroySpeed(ItemStack stack, BlockState state) {
 
-        return isCorrectToolForDrops(stack, state) ? speed : 1.0F;
+        return isCorrectToolForDrops(stack, state) ? getTier().getSpeed() : 1.0F;
     }
 
     @Override
-    public Multimap<Attribute, AttributeModifier> getAttributeModifiers(EquipmentSlot slot, ItemStack stack) {
+    public ItemAttributeModifiers getDefaultAttributeModifiers(ItemStack stack) {
 
-        Multimap<Attribute, AttributeModifier> multimap = HashMultimap.create();
-        if (slot == EquipmentSlot.MAINHAND) {
-            multimap.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_UUID, "Tool modifier", getAttackDamage(stack), AttributeModifier.Operation.ADDITION));
-            multimap.put(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_UUID, "Tool modifier", getAttackSpeed(stack), AttributeModifier.Operation.ADDITION));
-        }
-        return multimap;
+        return ItemAttributeModifiers.builder()
+                .add(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_ID, getAttackDamage(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .add(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_ID, getAttackSpeed(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .build();
     }
 
     @Override
@@ -133,7 +129,7 @@ public class FluxPickaxeItem extends PickaxeItemCoFH implements IMultiModeFluxIt
         if (player != null) {
             Level world = context.getLevel();
             if (player.isShiftKeyDown()) {
-                if (useEnergy(tool, true, player.abilities.instabuild)) {
+                if (useEnergy(tool, true, player.getAbilities().instabuild)) {
                     int r = REMOVE_RADIUS;
                     int r2 = r * r;
                     for (BlockPos pos : BlockPos.betweenClosed(context.getClickedPos().offset(-r, -r, -r), context.getClickedPos().offset(r, r, r))) {
@@ -146,10 +142,10 @@ public class FluxPickaxeItem extends PickaxeItemCoFH implements IMultiModeFluxIt
             } else {
                 BlockPos pos = context.getClickedPos().relative(context.getClickedFace());
                 BlockState state = world.getBlockState(pos);
-                if (state.getBlock().equals(FLUX_GLOW_AIR.get()) && useEnergy(tool, false, player.abilities.instabuild)) {
+                if (state.getBlock().equals(FLUX_GLOW_AIR.get()) && useEnergy(tool, false, player.getAbilities().instabuild)) {
                     removeAir(world, player, pos, 0.5F);
                     return InteractionResult.SUCCESS;
-                } else if (state.isAir() && useEnergy(tool, true, player.abilities.instabuild)) {
+                } else if (state.isAir() && useEnergy(tool, true, player.getAbilities().instabuild)) {
                     placeAir(world, player, pos, 0.5F);
                     return InteractionResult.SUCCESS;
                 }

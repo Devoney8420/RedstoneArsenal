@@ -28,18 +28,18 @@ public class FluxElytraControllerItem extends Item implements ICoFHItem, IMultiM
     public FluxElytraControllerItem(Item.Properties builder) {
 
         super(builder);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), (stack, world, entity, seed) -> isEmpowered(stack) ? 1.0F : 0.0F);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), (stack, world, entity, seed) -> isEmpowered(stack) ? 1.0F : 0.0F);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (isEmpowered(stack)) {
             tooltip.add(getTextComponent("info.redstone_arsenal.mode.1").withStyle(ChatFormatting.RED));
         } else {
             tooltip.add(getTextComponent("info.redstone_arsenal.mode.0").withStyle(ChatFormatting.GRAY));
         }
-        addModeChangeTooltip(this, stack, worldIn, tooltip, flagIn);
+        addModeChangeTooltip(this, stack, context.level(), tooltip, flagIn);
     }
 
     public boolean isEmpowered(ItemStack stack) {
@@ -68,9 +68,9 @@ public class FluxElytraControllerItem extends Item implements ICoFHItem, IMultiM
         if (chest.getItem() instanceof FluxElytraItem elytra) {
             elytra.setMode(chest, getMode(stack));
             if (isEmpowered(stack)) {
-                player.level.playSound(null, player.blockPosition(), SOUND_EMPOWER.get(), SoundSource.PLAYERS, 0.4F, 1.0F);
+                player.level().playSound(null, player.blockPosition(), SOUND_EMPOWER.get(), SoundSource.PLAYERS, 0.4F, 1.0F);
             } else {
-                player.level.playSound(null, player.blockPosition(), SOUND_QUELL.get(), SoundSource.PLAYERS, 0.2F, 0.6F);
+                player.level().playSound(null, player.blockPosition(), SOUND_QUELL.get(), SoundSource.PLAYERS, 0.2F, 0.6F);
             }
         } else {
             setMode(stack, isEmpowered(stack) ? 0 : 1);

@@ -27,11 +27,11 @@ public class FluxWrenchRenderer extends EntityRenderer<ThrownFluxWrench> {
     public void render(ThrownFluxWrench entityIn, float entityYaw, float partialTicks, PoseStack poseStackIn, MultiBufferSource bufferIn, int packedLightIn) {
 
         poseStackIn.pushPose();
-        poseStackIn.mulPose(Axis.YP.rotationDegrees(Mth.lerp(partialTicks, entityIn.yRotO, entityIn.yRot) + 180));
-        poseStackIn.mulPose(Axis.XP.rotationDegrees(Mth.lerp(partialTicks, entityIn.xRotO, entityIn.xRot) + 90));
+        poseStackIn.mulPose(Axis.YP.rotationDegrees(Mth.lerp(partialTicks, entityIn.yRotO, entityIn.getYRot()) + 180));
+        poseStackIn.mulPose(Axis.XP.rotationDegrees(Mth.lerp(partialTicks, entityIn.xRotO, entityIn.getXRot()) + 90));
         poseStackIn.mulPose(Axis.ZP.rotationDegrees((entityIn.tickCount + partialTicks) * 20));
         poseStackIn.scale(1.25F, 1.25F, 1.25F);
-        itemRenderer.renderStatic(entityIn.getItem(), ItemDisplayContext.GROUND, packedLightIn, OverlayTexture.NO_OVERLAY, poseStackIn, bufferIn, entityIn.level, 0);
+        itemRenderer.renderStatic(entityIn.getItem(), ItemDisplayContext.GROUND, packedLightIn, OverlayTexture.NO_OVERLAY, poseStackIn, bufferIn, entityIn.level(), 0);
         poseStackIn.popPose();
         super.render(entityIn, entityYaw, partialTicks, poseStackIn, bufferIn, packedLightIn);
     }

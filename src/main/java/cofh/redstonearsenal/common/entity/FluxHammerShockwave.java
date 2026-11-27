@@ -40,7 +40,7 @@ public class FluxHammerShockwave extends Shockwave {
     protected DamageSource getDamageSource(Vec3 pos) {
 
         Entity owner = getOwner();
-        DamageSources sources = level.damageSources();
+        DamageSources sources = level().damageSources();
         if (owner instanceof Player player) {
             return Utils.source(sources, DamageTypes.PLAYER_ATTACK, this, player, pos);
         }

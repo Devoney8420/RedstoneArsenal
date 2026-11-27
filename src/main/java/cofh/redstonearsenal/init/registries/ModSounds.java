@@ -19,7 +19,7 @@ public class ModSounds {
 
     public static DeferredHolder<SoundEvent, SoundEvent> registerSound(String soundID) {
 
-        return SOUND_EVENTS.register(soundID, () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(ID_REDSTONE_ARSENAL, soundID)));
+        return SOUND_EVENTS.register(soundID, () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, soundID)));
     }
 
     // region IDs

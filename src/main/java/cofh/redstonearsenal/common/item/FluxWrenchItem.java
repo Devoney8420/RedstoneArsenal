@@ -1,5 +1,9 @@
 package cofh.redstonearsenal.common.item;
 
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.entity.EquipmentSlotGroup;
 import cofh.core.common.config.CoreClientConfig;
 import cofh.core.common.item.ItemCoFH;
 import cofh.core.util.ProxyUtils;
@@ -8,8 +12,6 @@ import cofh.lib.api.block.IWrenchable;
 import cofh.lib.util.Utils;
 import cofh.lib.util.helpers.BlockHelper;
 import cofh.redstonearsenal.common.entity.ThrownFluxWrench;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
@@ -21,9 +23,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
@@ -49,7 +49,7 @@ import static cofh.lib.util.helpers.StringHelper.getTextComponent;
 
 public class FluxWrenchItem extends ItemCoFH implements IMultiModeFluxItem {
 
-    protected static final Set<Enchantment> VALID_ENCHANTS = new ObjectOpenHashSet<>();
+    protected static final Set<ResourceKey<Enchantment>> VALID_ENCHANTS = new ObjectOpenHashSet<>();
     protected final float damage;
     protected final float attackSpeed;
     protected final int throwCooldown;
@@ -71,15 +71,15 @@ public class FluxWrenchItem extends ItemCoFH implements IMultiModeFluxItem {
         this.extract = xfer;
         this.receive = xfer;
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -98,9 +98,14 @@ public class FluxWrenchItem extends ItemCoFH implements IMultiModeFluxItem {
     }
 
     @Override
-    public boolean canApplyAtEnchantingTable(ItemStack stack, Enchantment enchantment) {
+    public boolean supportsEnchantment(ItemStack stack, Holder<Enchantment> enchantment) {
+        return super.supportsEnchantment(stack, enchantment) || VALID_ENCHANTS.stream().anyMatch(enchantment::is);
+    }
 
-        return super.canApplyAtEnchantingTable(stack, enchantment) || VALID_ENCHANTS.contains(enchantment);
+    @Override
+    public boolean isPrimaryItemFor(ItemStack stack, Holder<Enchantment> enchantment) {
+
+        return super.isPrimaryItemFor(stack, enchantment) || VALID_ENCHANTS.stream().anyMatch(enchantment::is);
     }
 
     @Override
@@ -116,7 +121,7 @@ public class FluxWrenchItem extends ItemCoFH implements IMultiModeFluxItem {
         if (hasEnergy(stack, false)) {
             if (!world.isClientSide()) {
                 world.addFreshEntity(new ThrownFluxWrench(world, player, stack));
-                player.inventory.removeItem(stack);
+                player.getInventory().removeItem(stack);
                 player.getCooldowns().addCooldown(this, getRangedAttackCooldown(stack));
             }
             player.awardStat(Stats.ITEM_USED.get(this));
@@ -159,17 +164,17 @@ public class FluxWrenchItem extends ItemCoFH implements IMultiModeFluxItem {
             return false;
         }
         BlockPos pos = result.getBlockPos();
-        if (player == null || world.isEmptyBlock(pos) || !(hasEnergy(stack, false) || player.abilities.instabuild) || !player.mayUseItemAt(pos, result.getDirection(), stack)) {
+        if (player == null || world.isEmptyBlock(pos) || !(hasEnergy(stack, false) || player.getAbilities().instabuild) || !player.mayUseItemAt(pos, result.getDirection(), stack)) {
             return false;
         }
         BlockState state = world.getBlockState(pos);
         Block block = state.getBlock();
         if (block instanceof IWrenchable wrenchable && wrenchable.canWrench(world, pos, state, player)) {
             wrenchable.wrenchBlock(world, pos, state, result, player);
-            useEnergy(stack, false, player.abilities.instabuild);
+            useEnergy(stack, false, player.getAbilities().instabuild);
             return true;
         } else if (BlockHelper.attemptRotateBlock(state, world, pos)) {
-            useEnergy(stack, false, player.abilities.instabuild);
+            useEnergy(stack, false, player.getAbilities().instabuild);
             return true;
         }
         return false;
@@ -188,7 +193,7 @@ public class FluxWrenchItem extends ItemCoFH implements IMultiModeFluxItem {
     @Override
     public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
 
-        target.addEffect(new MobEffectInstance(WRENCHED.get(), 60, 0, false, false));
+        target.addEffect(new MobEffectInstance(WRENCHED, 60, 0, false, false));
         useEnergy(stack, false, attacker);
         return true;
     }
@@ -203,14 +208,12 @@ public class FluxWrenchItem extends ItemCoFH implements IMultiModeFluxItem {
     }
 
     @Override
-    public Multimap<Attribute, AttributeModifier> getAttributeModifiers(EquipmentSlot slot, ItemStack stack) {
+    public ItemAttributeModifiers getDefaultAttributeModifiers(ItemStack stack) {
 
-        Multimap<Attribute, AttributeModifier> multimap = HashMultimap.create();
-        if (slot == EquipmentSlot.MAINHAND) {
-            multimap.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_UUID, "Tool modifier", getAttackDamage(stack), AttributeModifier.Operation.ADDITION));
-            multimap.put(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_UUID, "Tool modifier", getAttackSpeed(stack), AttributeModifier.Operation.ADDITION));
-        }
-        return multimap;
+        return ItemAttributeModifiers.builder()
+                .add(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_ID, getAttackDamage(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .add(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_ID, getAttackSpeed(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .build();
     }
 
     protected float getAttackDamage(ItemStack stack) {

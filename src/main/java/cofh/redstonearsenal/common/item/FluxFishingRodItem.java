@@ -1,5 +1,6 @@
 package cofh.redstonearsenal.common.item;
 
+import net.minecraft.server.level.ServerLevel;
 import cofh.core.common.config.CoreClientConfig;
 import cofh.core.util.ProxyUtils;
 import cofh.lib.common.item.FishingRodItemCoFH;
@@ -50,16 +51,16 @@ public class FluxFishingRodItem extends FishingRodItemCoFH implements IMultiMode
         this.receive = xfer;
         setParams(enchantability, luckModifier, speedModifier);
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("cast"), (stack, world, entity, seed) -> entity instanceof Player player && player.fishing != null ? 1F : 0F);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("cast"), (stack, world, entity, seed) -> entity instanceof Player player && player.fishing != null ? 1F : 0F);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -85,14 +86,14 @@ public class FluxFishingRodItem extends FishingRodItemCoFH implements IMultiMode
                 }
             } else {
                 player.fishing.retrieve(stack);
-                useEnergy(stack, false, player.abilities.instabuild);
+                useEnergy(stack, false, player.getAbilities().instabuild);
                 world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.FISHING_BOBBER_RETRIEVE, SoundSource.NEUTRAL, 1.0F, 0.4F / (random.nextFloat() * 0.4F + 0.8F));
             }
         } else if (hasEnergy(stack, false)) {
             world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.FISHING_BOBBER_THROW, SoundSource.NEUTRAL, 0.5F, 0.4F / (random.nextFloat() * 0.4F + 0.8F));
-            if (!world.isClientSide) {
-                int luck = EnchantmentHelper.getFishingLuckBonus(stack) + luckModifier;
-                int speed = EnchantmentHelper.getFishingSpeedBonus(stack) + speedModifier;
+            if (world instanceof ServerLevel serverLevel) {
+                int luck = EnchantmentHelper.getFishingLuckBonus(serverLevel, stack, player) + luckModifier;
+                int speed = (int) (20 * EnchantmentHelper.getFishingTimeReduction(serverLevel, stack, player)) + speedModifier;
                 world.addFreshEntity(new FishingHook(player, world, luck, speed));
             }
             player.awardStat(Stats.ITEM_USED.get(this));
@@ -109,7 +110,7 @@ public class FluxFishingRodItem extends FishingRodItemCoFH implements IMultiMode
             if (player.fishing != null && player.fishing.getHookedIn() != null && isEmpowered(stack)) {
                 if (living.isShiftKeyDown()) {
                     player.fishing.discard();
-                } else if (useEnergy(stack, true, useDuration % reelEnergyUseInterval != 0 || player.abilities.instabuild)) {
+                } else if (useEnergy(stack, true, useDuration % reelEnergyUseInterval != 0 || player.getAbilities().instabuild)) {
                     reelIn(stack, player.fishing);
                     return;
                 }
@@ -121,7 +122,7 @@ public class FluxFishingRodItem extends FishingRodItemCoFH implements IMultiMode
     public void reelIn(ItemStack stack, FishingHook bobber) {
 
         Entity owner = bobber.getOwner();
-        if (!bobber.level.isClientSide && owner != null) {
+        if (!bobber.level().isClientSide && owner != null) {
             Entity target = bobber.getHookedIn();
             if (target == null) {
                 bobber.discard();
@@ -150,7 +151,7 @@ public class FluxFishingRodItem extends FishingRodItemCoFH implements IMultiMode
     }
 
     @Override
-    public int getUseDuration(ItemStack p_77626_1_) {
+    public int getUseDuration(ItemStack stack, LivingEntity entity) {
 
         return 72000;
     }
@@ -159,7 +160,7 @@ public class FluxFishingRodItem extends FishingRodItemCoFH implements IMultiMode
     public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
 
         if (attacker instanceof Player player) {
-            useEnergy(stack, false, player.abilities.instabuild);
+            useEnergy(stack, false, player.getAbilities().instabuild);
             if (isEmpowered(stack) && player.fishing != null) {
                 player.fishing.discard();
             }

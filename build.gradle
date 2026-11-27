@@ -5,12 +5,12 @@ plugins {
     id 'com.matthewprenger.cursegradle' version '1.4.0'
     id 'com.modrinth.minotaur' version "2.+"
 
-    id 'net.neoforged.gradle.userdev' version '7.0.97'
+    id 'net.neoforged.moddev' version '2.0.148'
 }
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(java_version.toInteger())
     }
     withSourcesJar()
     // withJavadocJar()
@@ -25,11 +25,43 @@ base {
 
 def buildVersion = "${mod_version}." + (System.getenv("BUILD_NUMBER") ?: '0')
 version = "${mc_version}-${buildVersion}"
-println "Starting build of ${archivesBaseName}, Version: ${mod_version}"
+println "Starting build of ${base.archivesName.get()}, Version: ${mod_version}"
 println "Using NeoForge: ${neo_version}, for Minecraft: ${mc_version}"
 
-minecraft {
-    accessTransformers.file file("src/main/resources/META-INF/accesstransformer.cfg")
+def arsenalTestWithThermal = providers.gradleProperty('arsenalTestWithThermal').isPresent()
+def arsenalTestFolder = arsenalTestWithThermal ? 'with-thermal' : 'standalone'
+
+neoForge {
+    version = neo_version
+    addModdingDependenciesTo(sourceSets.test)
+    runs {
+        client { client() }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+        data {
+            data()
+            programArguments.addAll '--mod', mod_id, '--all', '--output',
+                    file('src/main/generated').absolutePath, '--existing',
+                    file('src/main/resources').absolutePath
+        }
+    }
+    mods {
+        "${mod_id}" { sourceSet(sourceSets.main) }
+        redstone_arsenal_tests { sourceSet(sourceSets.test) }
+    }
+    runs.configureEach {
+        loadedMods.set([mods.named(mod_id).get()])
+    }
+    runs.create('arsenalTests') {
+        type = 'gameTestServer'
+        sourceSet = sourceSets.test
+        loadedMods.set([mods.named('redstone_arsenal_tests').get()])
+        gameDirectory = layout.buildDirectory.dir("arsenal-tests/${project.version}/${arsenalTestFolder}")
+        systemProperty 'neoforge.enabledGameTestNamespaces', 'redstone_arsenal_tests'
+        disableIdeRun()
+    }
 }
 
 if (System.getenv('CURSEFORGE_KEY') || project.hasProperty('curseforgeKey')) {
@@ -67,24 +99,36 @@ if (System.getenv('MODRINTH_TOKEN') || project.hasProperty('modrinthToken')) {
 }
 
 processResources {
-    filesMatching('META-INF/mods.toml') {
-        expand 'file': ['jarVersion': mod_version],
-                'mc_version': mc_version,
-                'neo_version': neo_version,
-                'lang_version': neo_version.split('\\.')[0],
-                'cofh_core_version_range': "[${cofh_core_version.replace(".+", "")},${cofh_core_max_version})"
+    def metadata = [mod_version: mod_version, mc_version: mc_version, neo_version: neo_version,
+                    cofh_core_version_range: "[${cofh_core_version},${cofh_core_max_version})"]
+    inputs.properties metadata
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand metadata
     }
 }
 
 repositories {
+    mavenCentral()
     mavenLocal()
     maven { url 'https://maven.covers1624.net/' }
     maven { url 'https://maven.blamejared.com/' }
 }
 
 dependencies {
-    implementation("net.neoforged:neoforge:${neo_version}")
-    implementation "com.teamcofh:cofh_core:${mc_version}-${cofh_core_version}+"
+    def cofhCoreJar = providers.gradleProperty('cofhCoreJar').getOrElse("../../Output/cofh_core-${mc_version}-${cofh_core_version}.1.jar")
+    implementation files(cofhCoreJar)
+}
+
+def stageArsenalTestJar = tasks.register('stageArsenalTestJar', Sync) {
+    from(tasks.named('jar', Jar).flatMap { it.archiveFile })
+    if (arsenalTestWithThermal) {
+        from('../../Output/thermal_core-1.21.1-11.0.7.4.jar', '../../Output/thermal_foundation-1.21.1-11.0.7.1.jar')
+    }
+    into(layout.buildDirectory.dir("arsenal-tests/${project.version}/${arsenalTestFolder}/mods"))
+}
+
+tasks.named('runArsenalTests') {
+    dependsOn(stageArsenalTestJar)
 }
 
 def commonManifest = {

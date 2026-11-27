@@ -1,5 +1,6 @@
 package cofh.redstonearsenal.common.item;
 
+import net.minecraft.world.item.Item;
 import cofh.lib.api.item.ICoFHItem;
 import cofh.lib.api.item.IEnergyContainerItem;
 import cofh.lib.util.Utils;
@@ -83,7 +84,7 @@ public interface IFluxItem extends ICoFHItem, IEnergyContainerItem {
     }
 
     @Override
-    default <T extends LivingEntity> int damageItem(ItemStack stack, int amount, T entity, Consumer<T> onBroken) {
+    default <T extends LivingEntity> int damageItem(ItemStack stack, int amount, T entity, Consumer<Item> onBroken) {
 
         useEnergy(stack, Math.min(getEnergyStored(stack), amount * getEnergyPerUse(false)), entity);
         return 0;
@@ -101,7 +102,7 @@ public interface IFluxItem extends ICoFHItem, IEnergyContainerItem {
 
     default int getBarWidth(ItemStack stack) {
 
-        if (stack.getTag() == null) {
+        if (getMaxEnergyStored(stack) <= 0) {
             return 0;
         }
         return (int) Math.round(13.0D * getEnergyStored(stack) / (double) getMaxEnergyStored(stack));
@@ -125,12 +126,12 @@ public interface IFluxItem extends ICoFHItem, IEnergyContainerItem {
 
     static DamageSource fluxDirectDamage(LivingEntity attacker) {
 
-        return attacker.level.damageSources().source(FLUX, attacker);
+        return attacker.level().damageSources().source(FLUX, attacker);
     }
 
     static DamageSource fluxRangedDamage(Projectile projectile, @Nullable Entity shooter) {
 
-        return projectile.level.damageSources().source(FLUX_RANGED, shooter, projectile);
+        return projectile.level().damageSources().source(FLUX_RANGED, projectile, shooter);
     }
 
 }

@@ -1,5 +1,11 @@
 package cofh.redstonearsenal.common.item;
 
+import java.util.ArrayList;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.ChargedProjectiles;
+import net.minecraft.core.component.DataComponents;
+import cofh.lib.util.helpers.StackData;
 import cofh.core.common.config.CoreClientConfig;
 import cofh.core.common.item.ILeftClickHandlerItem;
 import cofh.core.util.ProxyUtils;
@@ -9,8 +15,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -50,12 +54,12 @@ public class FluxCrossbowItem extends CrossbowItemCoFH implements IMultiModeFlux
         this.receive = xfer;
         this.maxCharges = maxCharges;
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (getLoadedAmmoCount(stack) > 0) {
             tooltip.add(Component.translatable("info.cofh.crossbow_loaded"));
@@ -64,7 +68,7 @@ public class FluxCrossbowItem extends CrossbowItemCoFH implements IMultiModeFlux
             }
         }
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -86,7 +90,7 @@ public class FluxCrossbowItem extends CrossbowItemCoFH implements IMultiModeFlux
     public InteractionResultHolder<ItemStack> use(Level world, Player player, InteractionHand hand) {
 
         ItemStack stack = player.getItemInHand(hand);
-        if (hasEnergy(stack, false) && getLoadedAmmoCount(stack) < maxCharges && (player.abilities.instabuild || !ArcheryHelper.findAmmo(player, stack).isEmpty())) {
+        if (hasEnergy(stack, false) && getLoadedAmmoCount(stack) < maxCharges && (player.getAbilities().instabuild || !ArcheryHelper.findAmmo(player, stack).isEmpty())) {
             player.startUsingItem(hand);
             return InteractionResultHolder.consume(stack);
         }
@@ -97,7 +101,7 @@ public class FluxCrossbowItem extends CrossbowItemCoFH implements IMultiModeFlux
     public ItemStack finishUsingItem(ItemStack stack, Level world, LivingEntity living) {
 
         if (!world.isClientSide && getLoadedAmmoCount(stack) < maxCharges && loadAmmo(living, stack)) {
-            setCharged(stack, true);
+
             world.playSound(null, living.getX(), living.getY(), living.getZ(), SoundEvents.CROSSBOW_LOADING_END, living instanceof Player ? SoundSource.PLAYERS : SoundSource.HOSTILE, 1.0F, 1.0F / (world.random.nextFloat() * 0.5F + 1.0F) + 0.2F);
         }
         return stack;
@@ -107,7 +111,7 @@ public class FluxCrossbowItem extends CrossbowItemCoFH implements IMultiModeFlux
     public void releaseUsing(ItemStack stack, Level world, LivingEntity living, int durationRemaining) {
 
         if (!world.isClientSide && durationRemaining < 0 && getLoadedAmmoCount(stack) < maxCharges && loadAmmo(living, stack)) {
-            setCharged(stack, true);
+
             world.playSound(null, living.getX(), living.getY(), living.getZ(), SoundEvents.CROSSBOW_LOADING_END, living instanceof Player ? SoundSource.PLAYERS : SoundSource.HOSTILE, 1.0F, 1.0F / (world.random.nextFloat() * 0.5F + 1.0F) + 0.2F);
         }
     }
@@ -119,18 +123,18 @@ public class FluxCrossbowItem extends CrossbowItemCoFH implements IMultiModeFlux
     }
 
     @Override
-    public boolean onBlockStartBreak(ItemStack stack, BlockPos pos, Player player) {
+    public boolean canAttackBlock(BlockState state, Level level, BlockPos pos, Player player) {
 
-        return player.isCreative();
+        return !player.isCreative();
     }
 
     @Override
     public void onCrossbowShot(Player shooter, InteractionHand hand, ItemStack crossbow, int damage) {
 
-        useEnergy(crossbow, Math.min(getEnergyPerUse(false) * damage, getEnergyStored(crossbow)), shooter.abilities.instabuild);
+        useEnergy(crossbow, Math.min(getEnergyPerUse(false) * damage, getEnergyStored(crossbow)), shooter.getAbilities().instabuild);
 
         if (shooter instanceof ServerPlayer) {
-            if (!shooter.level.isClientSide()) {
+            if (!shooter.level().isClientSide()) {
                 CriteriaTriggers.SHOT_CROSSBOW.trigger((ServerPlayer) shooter, crossbow);
             }
             shooter.awardStat(Stats.ITEM_USED.get(crossbow.getItem()));
@@ -144,48 +148,75 @@ public class FluxCrossbowItem extends CrossbowItemCoFH implements IMultiModeFlux
     }
 
     // region LOADING
-    public ListTag getLoadedAmmoNBT(ItemStack crossbow) {
+    private List<ItemStack> getAmmoQueue(ItemStack crossbow) {
 
-        CompoundTag tag = crossbow.getOrCreateTag();
-        if (tag.contains(TAG_AMMO) && tag.getTagType(TAG_AMMO) == 9) {
-            return tag.getList(TAG_AMMO, TAG_COMPOUND);
+        var projectiles = crossbow.getOrDefault(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.EMPTY);
+        if (!projectiles.isEmpty()) {
+            return projectiles.getItems();
         }
-        return new ListTag();
+        var legacy = crossbow.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+        if (!legacy.contains(TAG_AMMO)) {
+            return List.of();
+        }
+        var tags = legacy.copyTag().getList(TAG_AMMO, TAG_COMPOUND);
+        var registries = StackData.builtInRegistries();
+        List<ItemStack> loaded = new ArrayList<>(tags.size());
+        for (int i = 0; i < tags.size(); i++) {
+            var ammo = StackData.readItem(registries, tags.getCompound(i));
+            if (!ammo.isEmpty()) {
+                loaded.add(ammo);
+            }
+        }
+        return loaded;
     }
 
-    public ItemStack[] getAllLoadedAmmo(ItemStack crossbow) {
+    private void setAmmoQueue(ItemStack crossbow, List<ItemStack> queue) {
 
-        return getLoadedAmmoNBT(crossbow).stream().map(nbt -> nbt instanceof CompoundTag ? ItemStack.of((CompoundTag) nbt) : ItemStack.EMPTY).toArray(ItemStack[]::new);
+        if (crossbow.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).contains(TAG_AMMO)) {
+            CustomData.update(DataComponents.CUSTOM_DATA, crossbow, tag -> tag.remove(TAG_AMMO));
+        }
+        if (queue.isEmpty()) {
+            crossbow.remove(DataComponents.CHARGED_PROJECTILES);
+        } else {
+            crossbow.set(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.of(queue));
+        }
+    }
+
+    public List<ItemStack> getAllLoadedAmmo(ItemStack crossbow) {
+
+        return getAmmoQueue(crossbow);
     }
 
     public int getLoadedAmmoCount(ItemStack crossbow) {
 
-        return getLoadedAmmoNBT(crossbow).size();
+        return getAmmoQueue(crossbow).size();
     }
 
     @Override
     public boolean loadAmmo(Player player, ItemStack crossbow, ItemStack ammo) {
 
-        ListTag list = getLoadedAmmoNBT(crossbow);
-        list.add(ammo.save(new CompoundTag()));
-        crossbow.getOrCreateTag().put(TAG_AMMO, list);
-        setCharged(crossbow, true);
+        var queue = new ArrayList<>(getAmmoQueue(crossbow));
+        if (ammo.isEmpty() || queue.size() >= maxCharges) {
+            return false;
+        }
+        queue.add(ammo.copyWithCount(1));
+        setAmmoQueue(crossbow, queue);
         return true;
     }
 
     @Override
     public ItemStack getLoadedAmmo(ItemStack crossbow) {
 
-        ListTag list = getLoadedAmmoNBT(crossbow);
-        return list.isEmpty() ? ItemStack.EMPTY : ItemStack.of(list.getCompound(0));
+        var queue = getAmmoQueue(crossbow);
+        return queue.isEmpty() ? ItemStack.EMPTY : queue.getFirst();
     }
 
     @Override
     public void removeLoadedAmmo(ItemStack crossbow) {
 
-        ListTag list = getLoadedAmmoNBT(crossbow);
-        if (!list.isEmpty()) {
-            list.remove(0);
+        var queue = getAmmoQueue(crossbow);
+        if (!queue.isEmpty()) {
+            setAmmoQueue(crossbow, queue.subList(1, queue.size()));
         }
     }
     // endregion
@@ -234,18 +265,20 @@ public class FluxCrossbowItem extends CrossbowItemCoFH implements IMultiModeFlux
     @Override
     public void onLeftClick(Player player, ItemStack stack) {
 
-        if (isCharged(stack)) {
+        if (getLoadedAmmoCount(stack) > 0) {
+            if (!stack.has(DataComponents.CHARGED_PROJECTILES)) {
+                setAmmoQueue(stack, getAmmoQueue(stack));
+            }
             if (isEmpowered(stack)) {
-                float xRot = player.xRot;
+                float xRot = player.getXRot();
                 int count = getLoadedAmmoCount(stack);
                 for (int i = (1 - count) / 2; i <= count / 2; ++i) {
-                    player.xRot = xRot - 10 * i;
-                    shootLoadedAmmo(player.level, player, InteractionHand.MAIN_HAND, stack);
+                    player.setXRot(xRot - 10 * i);
+                    shootLoadedAmmo(player.level(), player, InteractionHand.MAIN_HAND, stack);
                 }
-                player.xRot = xRot;
-                setCharged(stack, false);
-            } else if (shootLoadedAmmo(player.level, player, InteractionHand.MAIN_HAND, stack) && getLoadedAmmoCount(stack) <= 0) {
-                setCharged(stack, false);
+                player.setXRot(xRot);
+            } else {
+                shootLoadedAmmo(player.level(), player, InteractionHand.MAIN_HAND, stack);
             }
         }
     }

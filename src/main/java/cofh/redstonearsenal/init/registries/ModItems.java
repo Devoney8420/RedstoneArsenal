@@ -93,7 +93,7 @@ public class ModItems {
     }
 
     public static final Tier MATERIAL_FLUX_METAL = new ItemTierCoFH(4, 0, 8.0F, 2.5F, 18, () -> Ingredient.EMPTY);
-    public static final ArmorMaterialCoFH FLUX_ELYTRA = new ArmorMaterialCoFH("redstone_arsenal:elytra", 0, new int[]{0, 0, 5, 0}, 18, SoundEvents.ARMOR_EQUIP_ELYTRA, 1.0F, 0.0F, MATERIAL_FLUX_METAL::getRepairIngredient);
-    public static final ArmorMaterialCoFH FLUX_ARMOR = new ArmorMaterialCoFH("redstone_arsenal:armor", 0, new int[]{3, 6, 8, 3}, 18, SoundEvents.ARMOR_EQUIP_GOLD, 1.0F, 0.0F, MATERIAL_FLUX_METAL::getRepairIngredient);
+    public static final ArmorMaterialCoFH FLUX_ELYTRA = new ArmorMaterialCoFH("redstone_arsenal:elytra", 0, new int[]{0, 0, 5, 0}, 18, SoundEvents.ARMOR_EQUIP_ELYTRA.value(), 1.0F, 0.0F, MATERIAL_FLUX_METAL::getRepairIngredient);
+    public static final ArmorMaterialCoFH FLUX_ARMOR = new ArmorMaterialCoFH("redstone_arsenal:armor", 0, new int[]{3, 6, 8, 3}, 18, SoundEvents.ARMOR_EQUIP_GOLD.value(), 1.0F, 0.0F, MATERIAL_FLUX_METAL::getRepairIngredient);
 
 }

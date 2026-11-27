@@ -32,21 +32,21 @@ public class FluxArrow extends AbstractArrow {
 
     public FluxArrow(EntityType<? extends FluxArrow> entityIn, Level worldIn) {
 
-        super(entityIn, worldIn, ItemStack.EMPTY);
+        super(entityIn, worldIn);
     }
 
     public FluxArrow(Level worldIn, LivingEntity shooter) {
 
-        super(FLUX_ARROW.get(), shooter, worldIn, ItemStack.EMPTY);
+        super(FLUX_ARROW.get(), shooter, worldIn, ItemStack.EMPTY, null);
     }
 
     public FluxArrow(Level worldIn, double x, double y, double z) {
 
-        super(FLUX_ARROW.get(), x, y, z, worldIn, ItemStack.EMPTY);
+        super(FLUX_ARROW.get(), x, y, z, worldIn, ItemStack.EMPTY, null);
     }
 
     @Override
-    protected ItemStack getPickupItem() {
+    protected ItemStack getDefaultPickupItem() {
 
         return ItemStack.EMPTY;
     }
@@ -62,10 +62,10 @@ public class FluxArrow extends AbstractArrow {
     }
 
     @Override
-    protected void defineSynchedData() {
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
 
-        super.defineSynchedData();
-        this.entityData.define(RSA_FLAGS, (byte) 0);
+        super.defineSynchedData(builder);
+        builder.define(RSA_FLAGS, (byte) 0);
     }
 
     private void setRSAFlag(int flag, boolean value) {
@@ -85,12 +85,12 @@ public class FluxArrow extends AbstractArrow {
 
     public void explode(Vec3 pos) {
 
-        if (!level.isClientSide()) {
-            ((ServerLevel) level).sendParticles(ParticleTypes.EXPLOSION, this.getX(), this.getY(), this.getZ(), 1, 0, 0, 0, 0);
-            level.playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 0.5F, (1.0F + (this.level.random.nextFloat() - this.level.random.nextFloat()) * 0.2F) * 0.7F);
+        if (!level().isClientSide()) {
+            ((ServerLevel) level()).sendParticles(ParticleTypes.EXPLOSION, this.getX(), this.getY(), this.getZ(), 1, 0, 0, 0, 0);
+            level().playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 0.5F, (1.0F + (this.level().random.nextFloat() - this.level().random.nextFloat()) * 0.2F) * 0.7F);
             double r2 = EXPLOSION_RANGE * EXPLOSION_RANGE;
             AABB searchArea = this.getBoundingBox().move(pos.subtract(this.position())).inflate(EXPLOSION_RANGE);
-            for (Entity target : level.getEntities(this, searchArea, EntitySelector.NO_CREATIVE_OR_SPECTATOR)) {
+            for (Entity target : level().getEntities(this, searchArea, EntitySelector.NO_CREATIVE_OR_SPECTATOR)) {
                 if (pos.distanceToSqr(target.getBoundingBox().getCenter()) < r2) {
                     target.hurt(getDamageSource(this, getOwner()), (float) getBaseDamage());
                 }
@@ -102,14 +102,14 @@ public class FluxArrow extends AbstractArrow {
     @Override
     public void tick() {
 
-        if (!level.isClientSide() && tickCount > LIFESPAN) {
+        if (!level().isClientSide() && tickCount > LIFESPAN) {
             discard();
         } else {
             super.tick();
             //if (!this.leftOwner) {
             //    this.leftOwner = this.checkLeftOwner();
             //}
-            //if (!this.level.isClientSide) {
+            //if (!this.level().isClientSide) {
             //    this.setSharedFlag(6, this.isGlowing());
             //}
             //this.baseTick();
@@ -117,9 +117,9 @@ public class FluxArrow extends AbstractArrow {
             //boolean noPhysics = this.isNoPhysics();
             //
             //BlockPos blockPos = this.blockPosition();
-            //BlockState state = this.level.getBlockState(blockPos);
-            //if (!state.isAir(this.level, blockPos) && !noPhysics) {
-            //    VoxelShape voxelshape = state.getCollisionShape(this.level, blockPos);
+            //BlockState state = this.level().getBlockState(blockPos);
+            //if (!state.isAir(this.level(), blockPos) && !noPhysics) {
+            //    VoxelShape voxelshape = state.getCollisionShape(this.level(), blockPos);
             //    if (!voxelshape.isEmpty()) {
             //        Vector3d vector3d1 = this.position();
             //
@@ -134,12 +134,12 @@ public class FluxArrow extends AbstractArrow {
             //
             //Vector3d currPos = this.position();
             //Vector3d nextPos = currPos.add(this.getDeltaMovement());
-            //RayTraceResult blockResult = this.level.clip(new RayTraceContext(currPos, nextPos, RayTraceContext.BlockMode.COLLIDER, RayTraceContext.FluidMode.NONE, this));
+            //RayTraceResult blockResult = this.level().clip(new RayTraceContext(currPos, nextPos, RayTraceContext.BlockMode.COLLIDER, RayTraceContext.FluidMode.NONE, this));
             //if (blockResult.getType() != RayTraceResult.Type.MISS) {
             //    nextPos = blockResult.getLocation();
             //}
             //// TODO: account for bouncing off invuln enemies
-            //for (EntityRayTraceResult entityResult : ArcheryHelper.findHitEntities(this.level, this, currPos, nextPos, this::canHitEntity).sorted(Comparator.comparingDouble(result -> result.getLocation().distanceToSqr(currPos))).collect(Collectors.toList())) {
+            //for (EntityRayTraceResult entityResult : ArcheryHelper.findHitEntities(this.level(), this, currPos, nextPos, this::canHitEntity).sorted(Comparator.comparingDouble(result -> result.getLocation().distanceToSqr(currPos))).collect(Collectors.toList())) {
             //    if (!this.isAlive()) {
             //        return;
             //    }
@@ -166,20 +166,20 @@ public class FluxArrow extends AbstractArrow {
             //double zVel = velocity.z;
             //if (this.isCritArrow()) {
             //    for(int i = 0; i < 4; ++i) {
-            //        this.level.addParticle(ParticleTypes.CRIT, this.getX() + xVel * i * 0.25F, this.getY() + yVel * i * 0.25F, this.getZ() + zVel * i * 0.25F, -xVel, -yVel + 0.2D, -zVel);
+            //        this.level().addParticle(ParticleTypes.CRIT, this.getX() + xVel * i * 0.25F, this.getY() + yVel * i * 0.25F, this.getZ() + zVel * i * 0.25F, -xVel, -yVel + 0.2D, -zVel);
             //    }
             //}
             //if (this.isInWater()) {
             //    for(int i = 0; i < 4; ++i) {
-            //        this.level.addParticle(ParticleTypes.BUBBLE, this.getX() + xVel * i * 0.25F, this.getY() + yVel * i * 0.25F, this.getZ() + zVel * i * 0.25F, xVel, yVel, zVel);
+            //        this.level().addParticle(ParticleTypes.BUBBLE, this.getX() + xVel * i * 0.25F, this.getY() + yVel * i * 0.25F, this.getZ() + zVel * i * 0.25F, xVel, yVel, zVel);
             //    }
             //}
             //
             //float radToDeg = 180F / (float) Math.PI;
             //float horzSpeed = MathHelper.sqrt(xVel * xVel + zVel * zVel);
             //if (this.xRotO == 0.0F && this.yRotO == 0.0F) {
-            //    this.yRotO = this.yRot;
-            //    this.xRotO = this.xRot;
+            //    this.yRotO = this.getYRot();
+            //    this.xRotO = this.getXRot();
             //}
             //this.xRot = lerpRotation(this.xRotO, (float) MathHelper.atan2(yVel, horzSpeed) * radToDeg);
             //this.yRot = lerpRotation(this.yRotO, (float)(MathHelper.atan2(xVel, zVel)) * radToDeg);
@@ -190,7 +190,7 @@ public class FluxArrow extends AbstractArrow {
         }
     }
 
-    public float getGravity() {
+    public double getDefaultGravity() {
 
         return this.isNoGravity() || this.noPhysics ? 0.0F : 0.05F;
     }
@@ -262,7 +262,7 @@ public class FluxArrow extends AbstractArrow {
     //                        living.push(vector3d.x, 0.1D, vector3d.z);
     //                    }
     //                }
-    //                if (!this.level.isClientSide && owner instanceof LivingEntity) {
+    //                if (!this.level().isClientSide && owner instanceof LivingEntity) {
     //                    EnchantmentHelper.doPostHurtEffects(living, owner);
     //                    EnchantmentHelper.doPostDamageEffects((LivingEntity) owner, living);
     //                }
@@ -273,7 +273,7 @@ public class FluxArrow extends AbstractArrow {
     //                if (!target.isAlive() && this.piercedAndKilledEntities != null) {
     //                    this.piercedAndKilledEntities.add(living);
     //                }
-    //                if (!this.level.isClientSide && owner instanceof ServerPlayer) {
+    //                if (!this.level().isClientSide && owner instanceof ServerPlayer) {
     //                    ServerPlayer serverPlayer = (ServerPlayer) owner;
     //                    if (this.piercedAndKilledEntities != null && this.shotFromCrossbow()) {
     //                        CriteriaTriggers.KILLED_BY_CROSSBOW.trigger(serverPlayer, this.piercedAndKilledEntities);
@@ -288,9 +288,9 @@ public class FluxArrow extends AbstractArrow {
     //            }
     //        } else {
     //            this.setDeltaMovement(this.getDeltaMovement().scale(-0.1D));
-    //            this.yRot += 180.0F;
+    //            this.getYRot() += 180.0F;
     //            this.yRotO += 180.0F;
-    //            if (!this.level.isClientSide && this.getDeltaMovement().lengthSqr() < 1.0E-7D) {
+    //            if (!this.level().isClientSide && this.getDeltaMovement().lengthSqr() < 1.0E-7D) {
     //                this.discard();
     //            }
     //        }
@@ -308,7 +308,7 @@ public class FluxArrow extends AbstractArrow {
             this.explode(result.getLocation());
             return;
         }
-        level.broadcastEntityEvent(this, (byte) 3);
+        level().broadcastEntityEvent(this, (byte) 3);
         this.discard();
     }
 

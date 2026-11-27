@@ -1,20 +1,17 @@
 package cofh.redstonearsenal.common.item;
 
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.Item;
 import cofh.core.common.config.CoreClientConfig;
 import cofh.core.common.item.ArmorItemCoFH;
 import cofh.core.util.ProxyUtils;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Multimap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attribute;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ArmorMaterial;
+import cofh.lib.common.item.ArmorMaterialCoFH;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
@@ -31,22 +28,22 @@ public class FluxArmorItem extends ArmorItemCoFH implements IFluxItem {
     protected int extract;
     protected int receive;
 
-    public FluxArmorItem(ArmorMaterial pMaterial, ArmorItem.Type pType, Properties pProperties, int maxEnergy, int maxTransfer) {
+    public FluxArmorItem(ArmorMaterialCoFH pMaterial, ArmorItem.Type pType, Properties pProperties, int maxEnergy, int maxTransfer) {
 
-        super(pMaterial, pType, pProperties);
+        super(pMaterial.asMaterial(false), pType, pProperties);
 
         this.maxEnergy = maxEnergy;
         this.extract = maxTransfer;
         this.receive = maxTransfer;
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -77,13 +74,13 @@ public class FluxArmorItem extends ArmorItemCoFH implements IFluxItem {
     }
 
     @Override
-    public Multimap<Attribute, AttributeModifier> getAttributeModifiers(EquipmentSlot slot, ItemStack stack) {
+    public ItemAttributeModifiers getDefaultAttributeModifiers(ItemStack stack) {
 
-        return hasEnergy(stack, false) && slot == this.getEquipmentSlot() ? super.getAttributeModifiers(slot, stack) : ImmutableMultimap.of();
+        return hasEnergy(stack, false) ? super.getDefaultAttributeModifiers() : ItemAttributeModifiers.EMPTY;
     }
 
     @Override
-    public <T extends LivingEntity> int damageItem(ItemStack stack, int amount, T entity, Consumer<T> onBroken) {
+    public <T extends LivingEntity> int damageItem(ItemStack stack, int amount, T entity, Consumer<Item> onBroken) {
 
         useEnergy(stack, Math.min(getEnergyStored(stack), amount * getEnergyPerUse(false)), entity);
         return 0;

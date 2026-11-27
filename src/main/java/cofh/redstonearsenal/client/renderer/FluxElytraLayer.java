@@ -13,9 +13,9 @@ import static cofh.lib.util.constants.ModIds.ID_REDSTONE_ARSENAL;
 
 public class FluxElytraLayer<T extends LivingEntity, M extends EntityModel<T>> extends ElytraLayer<T, M> {
 
-    protected static final ResourceLocation UNCHARGED = new ResourceLocation(ID_REDSTONE_ARSENAL + ":textures/entity/flux_elytra.png");
-    //protected static final ResourceLocation CHARGED = new ResourceLocation(ID_REDSTONE_ARSENAL + ":textures/entity/flux_elytra.png");
-    //protected static final ResourceLocation EMPOWERED = new ResourceLocation(ID_REDSTONE_ARSENAL + ":textures/entity/flux_elytra.png");
+    protected static final ResourceLocation UNCHARGED = ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "textures/entity/flux_elytra.png");
+    //protected static final ResourceLocation CHARGED = ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "textures/entity/flux_elytra.png");
+    //protected static final ResourceLocation EMPOWERED = ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "textures/entity/flux_elytra.png");
 
     public FluxElytraLayer(RenderLayerParent<T, M> parent, EntityModelSet set) {
 

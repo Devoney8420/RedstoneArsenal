@@ -12,17 +12,17 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
-import net.neoforged.neoforge.client.event.RegisterGuiOverlaysEvent;
-import net.neoforged.neoforge.client.gui.overlay.VanillaGuiOverlay;
+import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import org.apache.logging.log4j.Level;
 
 import static cofh.lib.util.constants.ModIds.ID_REDSTONE_ARSENAL;
 import static cofh.redstonearsenal.init.registries.ModEntities.*;
 
-@Mod.EventBusSubscriber (value = Dist.CLIENT, modid = ID_REDSTONE_ARSENAL, bus = Mod.EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(value = Dist.CLIENT, modid = ID_REDSTONE_ARSENAL)
 public class RSAClientSetupEvents {
 
     @SubscribeEvent
@@ -39,8 +39,9 @@ public class RSAClientSetupEvents {
                 }
             }
         }
-        EntityRenderDispatcher manager = Minecraft.getInstance().getEntityRenderDispatcher();
-        for (EntityRenderer<?> renderer : manager.renderers.values()) {
+
+        for (var type : event.getEntityTypes()) {
+            EntityRenderer<?> renderer = event.getRenderer(type);
             if (renderer instanceof HumanoidMobRenderer || renderer instanceof ArmorStandRenderer) {
                 LivingEntityRenderer<? extends LivingEntity, ? extends EntityModel<? extends LivingEntity>> livingRenderer = (LivingEntityRenderer<? extends LivingEntity, ? extends EntityModel<? extends LivingEntity>>) renderer;
                 try {
@@ -69,9 +70,9 @@ public class RSAClientSetupEvents {
     }
 
     @SubscribeEvent
-    public static void overlaySetup(final RegisterGuiOverlaysEvent event) {
+    public static void overlaySetup(final RegisterGuiLayersEvent event) {
 
-        event.registerAbove(VanillaGuiOverlay.AIR_LEVEL.id(), new ResourceLocation(ID_REDSTONE_ARSENAL, "flux_shielding"), new FluxShieldingOverlay());
+        event.registerAbove(VanillaGuiLayers.AIR_LEVEL, ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "flux_shielding"), new FluxShieldingOverlay());
     }
 
     // region RELOAD

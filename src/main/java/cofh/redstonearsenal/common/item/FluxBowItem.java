@@ -56,16 +56,16 @@ public class FluxBowItem extends BowItemCoFH implements IMultiModeFluxItem {
         this.receive = xfer;
         setParams(enchantability, accuracyModifier, damageModifier, velocityModifier);
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("pull"), this::getPullModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("pull"), this::getPullModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -178,7 +178,7 @@ public class FluxBowItem extends BowItemCoFH implements IMultiModeFluxItem {
         @Override
         public void onArrowLoosed(Player shooter) {
 
-            bowItem.useEnergy(bowStack, bowItem.isEmpowered(bowStack), shooter.abilities.instabuild);
+            bowItem.useEnergy(bowStack, bowItem.isEmpowered(bowStack), shooter.getAbilities().instabuild);
         }
 
         @Override
@@ -200,10 +200,10 @@ public class FluxBowItem extends BowItemCoFH implements IMultiModeFluxItem {
             if (ammoCap == null) {
                 ammoCap = new ArcheryAmmoItemWrapper(ammo);
             }
-            boolean infinite = shooter.abilities.instabuild
+            boolean infinite = shooter.getAbilities().instabuild
                     || ammoCap.isInfinite(bow, shooter)
                     || (ArcheryHelper.isArrow(ammo) && ((ArrowItem) ammo.getItem()).isInfinite(ammo, bow, shooter))
-                    || ammo.isEmpty() && getItemEnchantmentLevel(INFINITY_ARROWS, bow) > 0;
+                    || ammo.isEmpty() && getItemEnchantmentLevel(INFINITY, bow) > 0;
 
             if (!ammo.isEmpty() || infinite) {
                 if (ammo.isEmpty()) {
@@ -219,9 +219,9 @@ public class FluxBowItem extends BowItemCoFH implements IMultiModeFluxItem {
                     if (Utils.isServerWorld(world)) {
                         int encVolley = getItemEnchantmentLevel(getEnchantment(ID_ENSORCELLATION, ID_VOLLEY), bow);
                         int encTrueshot = getItemEnchantmentLevel(getEnchantment(ID_ENSORCELLATION, ID_TRUESHOT), bow);
-                        int encPunch = getItemEnchantmentLevel(PUNCH_ARROWS, bow);
-                        int encPower = getItemEnchantmentLevel(POWER_ARROWS, bow);
-                        int encFlame = getItemEnchantmentLevel(FLAMING_ARROWS, bow);
+
+
+
 
                         if (encTrueshot > 0) {
                             accuracyMod *= (1.5F / (1 + encTrueshot));
@@ -230,16 +230,16 @@ public class FluxBowItem extends BowItemCoFH implements IMultiModeFluxItem {
                         }
                         int numArrows = encVolley > 0 ? 3 : 1;
                         // Each additional arrow fired at a higher arc - arrows will not be fired beyond vertically. Maximum of 5 degrees between arrows.
-                        float volleyPitch = encVolley > 0 ? MathHelper.clamp(90.0F + shooter.xRot / encVolley, 0.0F, 5.0F) : 0;
+                        float volleyPitch = encVolley > 0 ? MathHelper.clamp(90.0F + shooter.getXRot() / encVolley, 0.0F, 5.0F) : 0;
 
                         BowItem bowItem = bow.getItem() instanceof BowItem ? (BowItem) bow.getItem() : null;
 
                         for (int shot = 0; shot < numArrows; ++shot) {
-                            AbstractArrow arrow = ArcheryHelper.createArrow(world, ammo, shooter);
+                            AbstractArrow arrow = ArcheryHelper.createArrow(world, ammo, shooter, bow);
                             if (bowItem != null) {
-                                arrow = bowItem.customArrow(arrow, ammo);
+                                arrow = bowItem.customArrow(arrow, ammo, bow);
                             }
-                            arrow.shootFromRotation(shooter, shooter.xRot - volleyPitch * shot, shooter.yRot, 0.0F, arrowVelocity * 3.0F * velocityMod, accuracyMod);// * (1 + shot * 2));
+                            arrow.shootFromRotation(shooter, shooter.getXRot() - volleyPitch * shot, shooter.getYRot(), 0.0F, arrowVelocity * 3.0F * velocityMod, accuracyMod);// * (1 + shot * 2));
                             arrow.setBaseDamage(arrow.getBaseDamage() * damageMod);
 
                             if (arrowVelocity >= 1.0F) {
@@ -247,15 +247,6 @@ public class FluxBowItem extends BowItemCoFH implements IMultiModeFluxItem {
                             }
                             if (encTrueshot > 0) {
                                 arrow.setPierceLevel((byte) encTrueshot);
-                            }
-                            if (encPower > 0 && arrow.getBaseDamage() > 0) {
-                                arrow.setBaseDamage(arrow.getBaseDamage() + (double) encPower * 0.5D + 0.5D);
-                            }
-                            if (encPunch > 0) {
-                                arrow.setKnockback(encPunch);
-                            }
-                            if (encFlame > 0) {
-                                arrow.setSecondsOnFire(100);
                             }
                             if (infinite || shot > 0) {
                                 arrow.pickup = AbstractArrow.Pickup.CREATIVE_ONLY;
@@ -269,10 +260,10 @@ public class FluxBowItem extends BowItemCoFH implements IMultiModeFluxItem {
                     }
                     world.playSound(null, shooter.getX(), shooter.getY(), shooter.getZ(), SoundEvents.ARROW_SHOOT, SoundSource.PLAYERS, 1.0F, 1.0F / (world.random.nextFloat() * 0.4F + 1.2F) + arrowVelocity * 0.5F);
 
-                    if (!infinite && !shooter.abilities.instabuild) {
+                    if (!infinite && !shooter.getAbilities().instabuild) {
                         ammoCap.onArrowLoosed(shooter);
                         if (ammo.isEmpty()) {
-                            shooter.inventory.removeItem(ammo);
+                            shooter.getInventory().removeItem(ammo);
                         }
                     }
                     shooter.awardStat(Stats.ITEM_USED.get(bow.getItem()));

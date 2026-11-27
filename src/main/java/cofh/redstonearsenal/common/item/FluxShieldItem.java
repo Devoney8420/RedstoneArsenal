@@ -24,7 +24,7 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.ToolAction;
+import net.neoforged.neoforge.common.ItemAbility;
 
 import javax.annotation.Nullable;
 import java.util.List;
@@ -49,16 +49,16 @@ public class FluxShieldItem extends ShieldItemCoFH implements IMultiModeFluxItem
         this.receive = maxTransfer;
         setEnchantability(enchantability);
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("blocking"), (stack, world, entity, seed) -> entity != null && entity.isUsingItem() && entity.getUseItem().equals(stack) ? 1.0F : 0.0F);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("blocking"), (stack, world, entity, seed) -> entity != null && entity.isUsingItem() && entity.getUseItem().equals(stack) ? 1.0F : 0.0F);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -117,7 +117,7 @@ public class FluxShieldItem extends ShieldItemCoFH implements IMultiModeFluxItem
     }
 
     @Override
-    public boolean canPerformAction(ItemStack stack, ToolAction action) {
+    public boolean canPerformAction(ItemStack stack, ItemAbility action) {
 
         return hasEnergy(stack, false) && super.canPerformAction(stack, action);
     }
@@ -198,7 +198,7 @@ public class FluxShieldItem extends ShieldItemCoFH implements IMultiModeFluxItem
         public float onBlock(LivingEntity target, DamageSource source, float amount) {
 
             if (shieldItem.isEmpowered(shieldStack)) {
-                shieldItem.repel(target.level, target, shieldStack);
+                shieldItem.repel(target.level(), target, shieldStack);
             }
             if (amount >= 3.0F && !(target instanceof Player player && player.isCreative())) {
                 int energy = Math.min(getEnergyStored(), Mth.ceil(amount) * shieldItem.getEnergyPerUse(false));

@@ -4,7 +4,7 @@ import cofh.redstonearsenal.common.network.data.client.FluxShieldingPayload;
 import cofh.redstonearsenal.util.FluxShieldingHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.neoforged.neoforge.network.handling.PlayPayloadContext;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public class FluxShieldingPacket {
 
@@ -15,14 +15,14 @@ public class FluxShieldingPacket {
         return INSTANCE;
     }
 
-    public void handle(final FluxShieldingPayload payload, final PlayPayloadContext context) {
+    public void handle(final FluxShieldingPayload payload, final IPayloadContext context) {
 
-        context.workHandler().submitAsync(() -> FluxShieldingHelper.updateHUD(payload.curCharges(), payload.maxCharges()));
+        context.enqueueWork(() -> FluxShieldingHelper.updateHUD(payload.curCharges(), payload.maxCharges()));
     }
 
     public static void sendToClient(int curCharges, int maxCharges, ServerPlayer player) {
 
-        PacketDistributor.PLAYER.with(player).send(new FluxShieldingPayload(curCharges, maxCharges));
+        PacketDistributor.sendToPlayer(player, new FluxShieldingPayload(curCharges, maxCharges));
     }
 
     public static void sendToClient(int[] charges, ServerPlayer player) {

@@ -1,5 +1,6 @@
 package cofh.redstonearsenal.common.entity;
 
+import net.minecraft.network.syncher.SynchedEntityData;
 import cofh.core.util.helpers.ArcheryHelper;
 import cofh.redstonearsenal.common.item.IFluxItem;
 import net.minecraft.world.entity.EntityType;
@@ -40,7 +41,7 @@ public class FluxSlash extends Projectile {
 
         this(worldIn, livingEntityIn.getX(), 0.7 * livingEntityIn.getEyeY() + 0.3 * livingEntityIn.getY(), livingEntityIn.getZ());
         this.setOwner(livingEntityIn);
-        this.shootFromRotation(livingEntityIn, livingEntityIn.xRot, livingEntityIn.yRot, 0.0F, defaultSpeed, 0.5F);
+        this.shootFromRotation(livingEntityIn, livingEntityIn.getXRot(), livingEntityIn.getYRot(), 0.0F, defaultSpeed, 0.5F);
     }
 
     public FluxSlash(Level worldIn, LivingEntity livingEntityIn, int damageModifier) {
@@ -56,7 +57,7 @@ public class FluxSlash extends Projectile {
     }
 
     @Override
-    protected void defineSynchedData() {
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
 
     }
 
@@ -87,7 +88,7 @@ public class FluxSlash extends Projectile {
         if (tickCount > duration) {
             discard();
         }
-        calculateCollision(this.level);
+        calculateCollision(this.level());
         checkInsideBlocks();
         Vec3 velocity = getDeltaMovement();
         setPos(getX() + velocity.x, getY() + velocity.y, getZ() + velocity.z);
@@ -114,7 +115,7 @@ public class FluxSlash extends Projectile {
             end = blockResult.getLocation();
             blockCollision = true;
         }
-        this.hitEntities(this.level, start, end);
+        this.hitEntities(this.level(), start, end);
 
         if (blockCollision && !EventHooks.onProjectileImpact(this, blockResult)) {
             this.onHitBlock(blockResult);

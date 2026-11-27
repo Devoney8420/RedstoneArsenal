@@ -1,5 +1,7 @@
 package cofh.redstonearsenal.common.item;
 
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.entity.EquipmentSlotGroup;
 import cofh.core.common.config.CoreClientConfig;
 import cofh.core.common.item.ExcavatorItem;
 import cofh.core.util.ProxyUtils;
@@ -7,9 +9,7 @@ import cofh.core.util.helpers.AreaEffectHelper;
 import cofh.lib.api.capability.IAreaEffectHandler;
 import cofh.lib.common.energy.EnergyContainerItemWrapper;
 import cofh.lib.util.Utils;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multimap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
@@ -21,9 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
@@ -35,8 +33,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.ToolAction;
-import net.neoforged.neoforge.common.ToolActions;
+import net.neoforged.neoforge.common.ItemAbility;
+import net.neoforged.neoforge.common.ItemAbilities;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -65,22 +63,22 @@ public class FluxExcavatorItem extends ExcavatorItem implements IMultiModeFluxIt
 
         super(tier, attackDamageIn, attackSpeedIn, builder);
 
-        this.damage = getAttackDamage();
+        this.damage = attackDamageIn + tier.getAttackDamageBonus();
         this.attackSpeed = attackSpeedIn;
 
         this.maxEnergy = energy;
         this.extract = xfer;
         this.receive = xfer;
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -130,7 +128,7 @@ public class FluxExcavatorItem extends ExcavatorItem implements IMultiModeFluxIt
                         sorted.computeIfAbsent(block, b -> new ArrayList<>()).add(fillPos);
                     }
                 }
-                NonNullList<ItemStack> inventory = player.inventory.items;
+                NonNullList<ItemStack> inventory = player.getInventory().items;
                 int energyPer = getEnergyPerUse(false) / 2;
                 int energyStored = getEnergyStored(tool);
                 int energyUse = 0;
@@ -182,9 +180,9 @@ public class FluxExcavatorItem extends ExcavatorItem implements IMultiModeFluxIt
     }
 
     @Override
-    public boolean canPerformAction(ItemStack stack, ToolAction action) {
+    public boolean canPerformAction(ItemStack stack, ItemAbility action) {
 
-        return hasEnergy(stack, false) && super.canPerformAction(stack, action) && action != ToolActions.SHOVEL_FLATTEN;
+        return hasEnergy(stack, false) && super.canPerformAction(stack, action) && action != ItemAbilities.SHOVEL_FLATTEN;
     }
 
     @Override
@@ -212,18 +210,16 @@ public class FluxExcavatorItem extends ExcavatorItem implements IMultiModeFluxIt
     @Override
     public float getDestroySpeed(ItemStack stack, BlockState state) {
 
-        return isCorrectToolForDrops(stack, state) ? speed : 1.0F;
+        return isCorrectToolForDrops(stack, state) ? getTier().getSpeed() : 1.0F;
     }
 
     @Override
-    public Multimap<Attribute, AttributeModifier> getAttributeModifiers(EquipmentSlot slot, ItemStack stack) {
+    public ItemAttributeModifiers getDefaultAttributeModifiers(ItemStack stack) {
 
-        Multimap<Attribute, AttributeModifier> multimap = HashMultimap.create();
-        if (slot == EquipmentSlot.MAINHAND) {
-            multimap.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_UUID, "Tool modifier", getAttackDamage(stack), AttributeModifier.Operation.ADDITION));
-            multimap.put(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_UUID, "Tool modifier", getAttackSpeed(stack), AttributeModifier.Operation.ADDITION));
-        }
-        return multimap;
+        return ItemAttributeModifiers.builder()
+                .add(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_ID, getAttackDamage(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .add(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_ID, getAttackSpeed(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .build();
     }
 
     protected float getAttackDamage(ItemStack stack) {

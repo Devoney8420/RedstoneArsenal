@@ -48,15 +48,15 @@ public class FluxQuiverItem extends ItemCoFH implements IMultiModeFluxItem {
         this.energyPerUseEmpowered *= energyUseMod;
         setEnchantability(enchantability);
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -134,7 +134,7 @@ public class FluxQuiverItem extends ItemCoFH implements IMultiModeFluxItem {
         @Override
         public void onArrowLoosed(Player shooter) {
 
-            quiverItem.useEnergy(container, quiverItem.isEmpowered(container), shooter != null && shooter.abilities.instabuild);
+            quiverItem.useEnergy(container, quiverItem.isEmpowered(container), shooter != null && shooter.getAbilities().instabuild);
         }
 
         @Override
@@ -165,7 +165,7 @@ public class FluxQuiverItem extends ItemCoFH implements IMultiModeFluxItem {
         @Override
         public boolean isInfinite(ItemStack bow, Player shooter) {
 
-            return shooter != null && shooter.abilities.instabuild || getItemEnchantmentLevel(Enchantments.INFINITY_ARROWS, bow) > 0;
+            return shooter != null && shooter.getAbilities().instabuild || getItemEnchantmentLevel(Enchantments.INFINITY, bow) > 0;
         }
 
     }

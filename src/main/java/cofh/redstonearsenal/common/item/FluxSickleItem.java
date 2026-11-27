@@ -1,5 +1,10 @@
 package cofh.redstonearsenal.common.item;
 
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.Holder;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.entity.EquipmentSlotGroup;
 import cofh.core.common.config.CoreClientConfig;
 import cofh.core.common.item.ILeftClickHandlerItem;
 import cofh.core.common.item.SickleItem;
@@ -8,9 +13,7 @@ import cofh.core.util.helpers.AreaEffectHelper;
 import cofh.lib.api.capability.IAreaEffectHandler;
 import cofh.lib.common.energy.EnergyContainerItemWrapper;
 import cofh.lib.util.Utils;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multimap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
@@ -20,9 +23,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -47,7 +48,7 @@ import static cofh.lib.util.helpers.StringHelper.getTextComponent;
 
 public class FluxSickleItem extends SickleItem implements IMultiModeFluxItem, ILeftClickHandlerItem {
 
-    protected static final Set<Enchantment> VALID_ENCHANTS = new ObjectOpenHashSet<>();
+    protected static final Set<ResourceKey<Enchantment>> VALID_ENCHANTS = new ObjectOpenHashSet<>();
     protected final float damage;
     protected final float attackSpeed;
 
@@ -59,22 +60,22 @@ public class FluxSickleItem extends SickleItem implements IMultiModeFluxItem, IL
 
         super(tier, attackDamageIn, attackSpeedIn, builder);
 
-        this.damage = getAttackDamage();
+        this.damage = attackDamageIn + tier.getAttackDamageBonus();
         this.attackSpeed = attackSpeedIn;
 
         this.maxEnergy = energy;
         this.extract = xfer;
         this.receive = xfer;
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -83,13 +84,18 @@ public class FluxSickleItem extends SickleItem implements IMultiModeFluxItem, IL
     public static void initEnchants() {
 
         VALID_ENCHANTS.add(Enchantments.SWEEPING_EDGE);
-        VALID_ENCHANTS.add(Enchantments.MOB_LOOTING);
+        VALID_ENCHANTS.add(Enchantments.LOOTING);
     }
 
     @Override
-    public boolean canApplyAtEnchantingTable(ItemStack stack, Enchantment enchantment) {
+    public boolean supportsEnchantment(ItemStack stack, Holder<Enchantment> enchantment) {
+        return super.supportsEnchantment(stack, enchantment) || VALID_ENCHANTS.stream().anyMatch(enchantment::is);
+    }
 
-        return super.canApplyAtEnchantingTable(stack, enchantment) || VALID_ENCHANTS.contains(enchantment);
+    @Override
+    public boolean isPrimaryItemFor(ItemStack stack, Holder<Enchantment> enchantment) {
+
+        return super.isPrimaryItemFor(stack, enchantment) || VALID_ENCHANTS.stream().anyMatch(enchantment::is);
     }
 
     @Override
@@ -139,20 +145,19 @@ public class FluxSickleItem extends SickleItem implements IMultiModeFluxItem, IL
     }
 
     @Override
-    public boolean onBlockStartBreak(ItemStack stack, BlockPos pos, Player player) {
+    public boolean canAttackBlock(BlockState state, Level level, BlockPos pos, Player player) {
 
-        return player.isCreative() && (!isCorrectToolForDrops(stack, player.level.getBlockState(pos)) || (isEmpowered(stack) && !AreaEffectHelper.isMature(player.level, pos)));
+        ItemStack stack = player.getMainHandItem();
+        return !player.isCreative() || isCorrectToolForDrops(stack, state) && (!isEmpowered(stack) || AreaEffectHelper.isMature(level, pos));
     }
 
     @Override
-    public Multimap<Attribute, AttributeModifier> getAttributeModifiers(EquipmentSlot slot, ItemStack stack) {
+    public ItemAttributeModifiers getDefaultAttributeModifiers(ItemStack stack) {
 
-        Multimap<Attribute, AttributeModifier> multimap = HashMultimap.create();
-        if (slot == EquipmentSlot.MAINHAND) {
-            multimap.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_UUID, "Tool modifier", getAttackDamage(stack), AttributeModifier.Operation.ADDITION));
-            multimap.put(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_UUID, "Tool modifier", getAttackSpeed(stack), AttributeModifier.Operation.ADDITION));
-        }
-        return multimap;
+        return ItemAttributeModifiers.builder()
+                .add(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_ID, getAttackDamage(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .add(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_ID, getAttackSpeed(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .build();
     }
 
     protected float getAttackDamage(ItemStack stack) {
@@ -167,7 +172,7 @@ public class FluxSickleItem extends SickleItem implements IMultiModeFluxItem, IL
 
     public float getEfficiency(ItemStack stack) {
 
-        return speed;
+        return getTier().getSpeed();
     }
 
     // region DURABILITY BAR
@@ -240,29 +245,33 @@ public class FluxSickleItem extends SickleItem implements IMultiModeFluxItem, IL
     @Override
     public void onLeftClick(Player player, ItemStack stack) {
 
+        if (!(player.level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
         float strength = player.getAttackStrengthScale(0.5F);
         if (strength < 0.9F || player.isSprinting() || player.isSecondaryUseActive() || !hasEnergy(stack, false)) {
             return;
         }
         float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE) * (0.2F + strength * strength * 0.8F);
-        float sweep = EnchantmentHelper.getSweepingDamageRatio(player);
+        float sweep = (float) player.getAttributeValue(Attributes.SWEEPING_DAMAGE_RATIO);
         boolean empowered = isEmpowered(stack);
         boolean hit = false;
-        for (LivingEntity target : player.level.getEntitiesOfClass(LivingEntity.class, stack.getSweepHitBox(player, player))) {
+        for (LivingEntity target : player.level().getEntitiesOfClass(LivingEntity.class, stack.getSweepHitBox(player, player))) {
             if (target == player || player.isAlliedTo(target) || (empowered && target.isBaby()) ||
-                    (target instanceof ArmorStand stand && stand.isMarker()) || !player.canReach(target, 0)) {
+                    (target instanceof ArmorStand stand && stand.isMarker()) || !player.canInteractWithEntity(target, 0)) {
                 continue;
             }
             hit = true;
             Vec3 disp = player.position().subtract(target.position());
             target.knockback(0.3F, disp.x, disp.z);
-            float bonus = EnchantmentHelper.getDamageBonus(stack, target.getMobType()) * strength;
-            target.hurt(player.level.damageSources().playerAttack(player), 1.0F + (damage + bonus) * sweep);
+            var source = serverLevel.damageSources().playerAttack(player);
+            float bonus = (EnchantmentHelper.modifyDamage(serverLevel, stack, target, source, damage) - damage) * strength;
+            target.hurt(source, 1.0F + (damage + bonus) * sweep);
         }
         if (hit) {
             useEnergy(stack, false, player);
         }
-        player.level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.PLAYER_ATTACK_SWEEP, player.getSoundSource(), 1.0F, 1.0F);
+        player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.PLAYER_ATTACK_SWEEP, player.getSoundSource(), 1.0F, 1.0F);
         player.sweepAttack();
     }
     // endregion

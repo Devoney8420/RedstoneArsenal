@@ -1,5 +1,7 @@
 package cofh.redstonearsenal.common.entity;
 
+import cofh.lib.util.helpers.StackData;
+import net.minecraft.world.level.block.Portal;
 import cofh.core.util.helpers.ArcheryHelper;
 import cofh.lib.util.Utils;
 import cofh.redstonearsenal.RedstoneArsenal;
@@ -10,7 +12,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -20,7 +22,6 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.MobType;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
@@ -31,8 +32,6 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.*;
 import net.neoforged.neoforge.entity.IEntityWithComplexSpawn;
@@ -65,13 +64,13 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
         this(worldIn, livingEntityIn.getX(), livingEntityIn.getEyeY() - 0.1F, livingEntityIn.getZ());
         this.setOwner(livingEntityIn);
         this.setItem(stackIn);
-        this.shootFromRotation(livingEntityIn, livingEntityIn.xRot, livingEntityIn.yRot, 0.0F, speed, 0.5F);
+        this.shootFromRotation(livingEntityIn, livingEntityIn.getXRot(), livingEntityIn.getYRot(), 0.0F, speed, 0.5F);
     }
 
     @Override
-    protected void defineSynchedData() {
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
 
-        this.getEntityData().define(DATA_ITEM_STACK, new ItemStack(getDefaultItem()));
+        builder.define(DATA_ITEM_STACK, new ItemStack(getDefaultItem()));
     }
 
     protected Item getDefaultItem() {
@@ -92,7 +91,7 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
 
     public void setItem(ItemStack stack) {
 
-        if (stack.getItem() != this.getDefaultItem() || stack.hasTag()) {
+        if (stack.getItem() != this.getDefaultItem() || !stack.getComponentsPatch().isEmpty()) {
             this.getEntityData().set(DATA_ITEM_STACK, Util.make(stack.copy(), (itemStack) -> itemStack.setCount(1)));
         }
     }
@@ -108,7 +107,7 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
 
         super.tick();
 
-        calculateCollision(this.level);
+        calculateCollision(this.level());
         checkInsideBlocks();
 
         if (!this.isAlive()) {
@@ -141,7 +140,7 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
 
         if (this.isInWater()) {
             for (int i = 0; i < 4; ++i) {
-                level.addParticle(ParticleTypes.BUBBLE, getX() + velocity.x * 0.75D, getY() + velocity.y * 0.75D, getZ() + velocity.z * 0.75D, velocity.x, velocity.y, velocity.z);
+                level().addParticle(ParticleTypes.BUBBLE, getX() + velocity.x * 0.75D, getY() + velocity.y * 0.75D, getZ() + velocity.z * 0.75D, velocity.x, velocity.y, velocity.z);
             }
         }
 
@@ -158,18 +157,13 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
             end = blockResult.getLocation();
             BlockPos blockpos = blockResult.getBlockPos();
             BlockState blockstate = world.getBlockState(blockpos);
-            if (blockstate.is(Blocks.NETHER_PORTAL)) {
-                this.handleInsidePortal(blockpos);
-            } else if (blockstate.is(Blocks.END_GATEWAY)) {
-                BlockEntity blockentity = this.level.getBlockEntity(blockpos);
-                if (blockentity instanceof TheEndGatewayBlockEntity && TheEndGatewayBlockEntity.canEntityTeleport(this)) {
-                    TheEndGatewayBlockEntity.teleportEntity(this.level, blockpos, blockstate, this, (TheEndGatewayBlockEntity) blockentity);
-                }
+            if (blockstate.getBlock() instanceof Portal portal) {
+                this.setAsInsidePortal(portal, blockpos);
             } else {
                 blockCollision = true;
             }
         }
-        this.hitEntities(this.level, start, end);
+        this.hitEntities(this.level(), start, end);
         if (blockCollision && !EventHooks.onProjectileImpact(this, blockResult)) {
             this.onHitBlock(blockResult);
         }
@@ -216,22 +210,22 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
 
     protected void returnToInventory(Entity owner) {
 
-        if (!(owner instanceof Player player && player.inventory.add(this.getItem()))) {
-            level.addFreshEntity(new ItemEntity(level, owner.getX(), owner.getY(), owner.getZ(), this.getItem()));
+        if (!(owner instanceof Player player && player.getInventory().add(this.getItem()))) {
+            level().addFreshEntity(new ItemEntity(level(), owner.getX(), owner.getY(), owner.getZ(), this.getItem()));
         }
         this.discard();
     }
 
     protected void teleportEffects(Entity owner) {
 
-        if (level.isClientSide) {
+        if (level().isClientSide) {
             return;
         }
         Vec3 pos = position();
         AABB bounds = getBoundingBox();
-        ((ServerLevel) level).sendParticles(DustParticleOptions.REDSTONE, pos.x, pos.y, pos.z, 10, bounds.getXsize() * 0.4, bounds.getYsize() * 0.5, bounds.getZsize() * 0.4, 0);
+        ((ServerLevel) level()).sendParticles(DustParticleOptions.REDSTONE, pos.x, pos.y, pos.z, 10, bounds.getXsize() * 0.4, bounds.getYsize() * 0.5, bounds.getZsize() * 0.4, 0);
         pos = owner.position();
-        level.playSound(null, pos.x, pos.y, pos.z, SoundEvents.CHORUS_FRUIT_TELEPORT, SoundSource.BLOCKS, 0.5F, (1.0F + (this.level.random.nextFloat() - this.level.random.nextFloat()) * 0.2F) * 0.7F);
+        level().playSound(null, pos.x, pos.y, pos.z, SoundEvents.CHORUS_FRUIT_TELEPORT, SoundSource.BLOCKS, 0.5F, (1.0F + (this.level().random.nextFloat() - this.level().random.nextFloat()) * 0.2F) * 0.7F);
     }
 
     @Override
@@ -239,7 +233,7 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
 
         if (event == 3) {
             Vec3 pos = position();
-            level.addParticle(DustParticleOptions.REDSTONE, pos.x, pos.y, pos.z, 0, 0, 0);
+            level().addParticle(DustParticleOptions.REDSTONE, pos.x, pos.y, pos.z, 0, 0, 0);
             Entity owner = getOwner();
             if (owner != null) {
                 //Vec3 disp = owner.position().add(0, owner.getBbHeight() * 0.5F, 0).subtract(pos);
@@ -257,7 +251,7 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
     @Override
     protected void onHitEntity(EntityHitResult result) {
 
-        if (!this.isAlive() || level.isClientSide()) {
+        if (!this.isAlive() || level().isClientSide()) {
             return;
         }
         Entity target = result.getEntity();
@@ -268,7 +262,7 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
             if (target.hurt(IFluxItem.fluxRangedDamage(this, owner), calculateDamage(target)) && target.getType() != EntityType.ENDERMAN) {
                 int fireAspect = Utils.getItemEnchantmentLevel(Enchantments.FIRE_ASPECT, this.getItem());
                 if (this.isOnFire() || fireAspect > 0) {
-                    target.setSecondsOnFire(Math.max(this.isOnFire() ? 5 : 0, fireAspect * 4));
+                    target.igniteForSeconds(Math.max(this.isOnFire() ? 5 : 0, fireAspect * 4));
                 }
             }
         }
@@ -280,13 +274,14 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
         ItemStack stack = this.getItem();
         Entity owner = this.getOwner();
         float damage = ((FluxWrenchItem) stack.getItem()).getRangedAttackDamage(stack);
+        if (level() instanceof ServerLevel serverLevel) {
+            damage = EnchantmentHelper.modifyDamage(serverLevel, stack, target, IFluxItem.fluxRangedDamage(this, owner), damage);
+        }
         if (target instanceof LivingEntity) {
-            damage += EnchantmentHelper.getDamageBonus(stack, ((LivingEntity) target).getMobType());
+
             if (owner instanceof LivingEntity) {
                 stack.getItem().hurtEnemy(stack, (LivingEntity) target, (LivingEntity) owner);
             }
-        } else {
-            damage += EnchantmentHelper.getDamageBonus(stack, MobType.UNDEFINED);
         }
         return damage;
     }
@@ -294,15 +289,15 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
     @Override
     protected void onHitBlock(BlockHitResult result) {
 
-        if (!this.isAlive() || level.isClientSide()) {
+        if (!this.isAlive() || level().isClientSide()) {
             return;
         }
-        BlockState state = this.level.getBlockState(result.getBlockPos());
-        state.onProjectileHit(this.level, state, result, this);
+        BlockState state = this.level().getBlockState(result.getBlockPos());
+        state.onProjectileHit(this.level(), state, result, this);
         Entity owner = this.getOwner();
         ItemStack stack = this.getItem();
         if (owner instanceof Player && stack.getItem() instanceof FluxWrenchItem wrench) {
-            wrench.useRanged(level, stack, (Player) owner, result);
+            wrench.useRanged(level(), stack, (Player) owner, result);
         }
         onHit(result);
     }
@@ -312,7 +307,7 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
 
         super.readAdditionalSaveData(nbt);
 
-        ItemStack itemstack = ItemStack.of(nbt.getCompound("item"));
+        ItemStack itemstack = StackData.readItem(registryAccess(), nbt.getCompound("item"));
         this.setItem(itemstack);
         hitSomething = nbt.getBoolean("hit");
     }
@@ -324,24 +319,24 @@ public class ThrownFluxWrench extends Projectile implements IEntityWithComplexSp
 
         ItemStack itemstack = this.getItemRaw();
         if (!itemstack.isEmpty()) {
-            nbt.put("item", itemstack.save(new CompoundTag()));
+            nbt.put("item", itemstack.save(registryAccess()));
         }
         nbt.putBoolean("hit", hitSomething);
     }
 
     @Override
-    public void writeSpawnData(FriendlyByteBuf buffer) {
+    public void writeSpawnData(RegistryFriendlyByteBuf buffer) {
 
         Entity owner = this.getOwner();
         buffer.writeInt(owner == null ? -1 : owner.getId());
     }
 
     @Override
-    public void readSpawnData(FriendlyByteBuf additionalData) {
+    public void readSpawnData(RegistryFriendlyByteBuf additionalData) {
 
         int id = additionalData.readInt();
         if (id >= 0) {
-            setOwner(level.getEntity(id));
+            setOwner(level().getEntity(id));
         }
     }
 

@@ -18,13 +18,13 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.common.ToolAction;
-import net.neoforged.neoforge.common.ToolActions;
-import net.neoforged.neoforge.event.entity.living.LivingAttackEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.ItemAbility;
+import net.neoforged.neoforge.common.ItemAbilities;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingFallEvent;
-import net.neoforged.neoforge.event.entity.living.LivingHurtEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerFlyableFallEvent;
@@ -34,7 +34,7 @@ import static cofh.lib.util.constants.ModIds.ID_REDSTONE_ARSENAL;
 import static cofh.redstonearsenal.init.registries.ModBlocks.FLUX_PATH;
 import static net.minecraft.world.entity.EquipmentSlot.MAINHAND;
 
-@Mod.EventBusSubscriber (modid = ID_REDSTONE_ARSENAL)
+@EventBusSubscriber(modid = ID_REDSTONE_ARSENAL)
 public class RSAEvents {
 
     @SubscribeEvent (priority = EventPriority.LOWEST)
@@ -47,7 +47,7 @@ public class RSAEvents {
         ItemStack stack = player.getMainHandItem();
         // Flux Trident
         if (stack.getItem() instanceof FluxTridentItem trident && player.isAutoSpinAttack()) {
-            if (trident.plungeAttack(player.level, player, stack)) {
+            if (trident.plungeAttack(player.level(), player, stack)) {
                 event.getTarget().invulnerableTime = 0;
             }
         }
@@ -61,7 +61,7 @@ public class RSAEvents {
             LivingEntity living = event.getEntity();
             ItemStack stack = living.getMainHandItem();
             if (stack.getItem() instanceof FluxTridentItem trident && living.isAutoSpinAttack()) {
-                if (trident.plungeAttack(living.level, living, stack)) {
+                if (trident.plungeAttack(living.level(), living, stack)) {
                     FluxTridentItem.stopSpinAttack(living);
                     event.setCanceled(true);
                 } else {
@@ -78,7 +78,7 @@ public class RSAEvents {
         Player player = event.getEntity();
         ItemStack stack = player.getMainHandItem();
         if (stack.getItem() instanceof FluxTridentItem trident && player.isAutoSpinAttack()) {
-            if (trident.plungeAttack(player.level, player, stack)) {
+            if (trident.plungeAttack(player.level(), player, stack)) {
                 FluxTridentItem.stopSpinAttack(player);
             }
         }
@@ -108,7 +108,7 @@ public class RSAEvents {
         // Flux Sickle
         event.getPosition().ifPresent(pos -> {
             if (stack.getItem() instanceof FluxSickleItem sickle && event.getNewSpeed() > 0.0F &&
-                    sickle.isEmpowered(stack) && !AreaEffectHelper.isMature(player.level, pos, event.getState())) {
+                    sickle.isEmpowered(stack) && !AreaEffectHelper.isMature(player.level(), pos, event.getState())) {
                 event.setNewSpeed(0.0F);
             }
         });
@@ -123,8 +123,8 @@ public class RSAEvents {
         // Flux Shovel
         ItemStack stack = event.getHeldItemStack();
         Item item = stack.getItem();
-        ToolAction action = event.getToolAction();
-        if (action.equals(ToolActions.SHOVEL_FLATTEN)) {
+        ItemAbility action = event.getItemAbility();
+        if (action.equals(ItemAbilities.SHOVEL_FLATTEN)) {
             if (item instanceof FluxShovelItem shovel) {
                 BlockState state = event.getState();
                 if (state.is(Blocks.DIRT_PATH) || state.is(FLUX_PATH.get()) || state.is(Blocks.FARMLAND)) {
@@ -143,7 +143,7 @@ public class RSAEvents {
     }
 
     @SubscribeEvent (priority = EventPriority.LOWEST)
-    public static void handleLivingAttackEvent(LivingAttackEvent event) {
+    public static void handleLivingIncomingDamageEvent(LivingIncomingDamageEvent event) {
 
         if (event.isCanceled()) {
             return;
@@ -180,23 +180,20 @@ public class RSAEvents {
     }
 
     @SubscribeEvent (priority = EventPriority.LOWEST)
-    public static void handleLivingHurtEvent(LivingHurtEvent event) {
+    public static void handleLivingDamageEvent(LivingDamageEvent.Pre event) {
 
-        if (event.isCanceled()) {
-            return;
-        }
         // Flux Shielding
         DamageSource source = event.getSource();
         if (source.is(DamageTypeTags.BYPASSES_ARMOR) && source.is(DamageTypeTags.BYPASSES_EFFECTS)) {
             return;
         }
-        float amount = event.getAmount();
+        float amount = event.getNewDamage();
         if (amount <= 0.0F) {
             return;
         }
         LivingEntity target = event.getEntity();
         if (FluxShieldingHelper.useFluxShieldCharge(target)) {
-            event.setAmount(Math.max(amount - 500.0F, 0));
+            event.setNewDamage(Math.max(amount - 500.0F, 0));
             if (target instanceof ServerPlayer) {
                 FluxShieldingHelper.updateHUD((ServerPlayer) target);
             }

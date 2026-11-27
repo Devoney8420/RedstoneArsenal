@@ -1,8 +1,11 @@
 package cofh.redstonearsenal.init.data.providers;
 
 import cofh.lib.init.data.RecipeProviderCoFH;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.recipes.RecipeOutput;
+
+import java.util.concurrent.CompletableFuture;
 
 import static cofh.lib.util.constants.ModIds.ID_REDSTONE_ARSENAL;
 import static cofh.redstonearsenal.RedstoneArsenal.ITEMS;
@@ -10,9 +13,9 @@ import static cofh.redstonearsenal.init.registries.ModIDs.*;
 
 public class ModRecipeProvider extends RecipeProviderCoFH {
 
-    public ModRecipeProvider(PackOutput output) {
+    public ModRecipeProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> registries) {
 
-        super(output, ID_REDSTONE_ARSENAL);
+        super(output, ID_REDSTONE_ARSENAL, registries);
     }
 
     @Override

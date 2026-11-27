@@ -1,5 +1,9 @@
 package cofh.redstonearsenal;
 
+import net.neoforged.neoforge.event.ModifyDefaultComponentsEvent;
+import net.minecraft.world.item.SwordItem;
+import net.minecraft.world.item.DiggerItem;
+import net.minecraft.core.component.DataComponents;
 import cofh.core.client.event.CoreClientEvents;
 import cofh.core.common.capability.CoreCapabilities;
 import cofh.core.common.config.ConfigManager;
@@ -41,7 +45,7 @@ public class RedstoneArsenal {
     public static final Logger LOG = LogManager.getLogger(ID_REDSTONE_ARSENAL);
     public static final ConfigManager CONFIG_MANAGER = new ConfigManager();
 
-    // public static final PacketHandler PACKET_HANDLER = new PacketHandler(new ResourceLocation(ID_REDSTONE_ARSENAL, "flux_shielding"), LOG);
+    // public static final PacketHandler PACKET_HANDLER = new PacketHandler(ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "flux_shielding"), LOG);
 
     public static final DeferredRegisterCoFH<Block> BLOCKS = DeferredRegisterCoFH.create(BuiltInRegistries.BLOCK, ID_REDSTONE_ARSENAL);
     public static final DeferredRegisterCoFH<Item> ITEMS = DeferredRegisterCoFH.create(BuiltInRegistries.ITEM, ID_REDSTONE_ARSENAL);
@@ -57,6 +61,7 @@ public class RedstoneArsenal {
         CONFIG_MANAGER.setupServer();
 
         modEventBus.addListener(this::capSetup);
+        modEventBus.addListener(this::configureItemAttributes);
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::clientSetup);
         // modEventBus.addListener(this::creativeTabSetup);
@@ -79,6 +84,18 @@ public class RedstoneArsenal {
     }
 
     // region INITIALIZATION
+    private void configureItemAttributes(ModifyDefaultComponentsEvent event) {
+
+        // A prototype attribute component would take priority over the energy-dependent modifiers.
+        ITEMS.getRegistryObjects().values().forEach(holder -> {
+            var item = holder.value();
+            if (item instanceof DiggerItem || item instanceof SwordItem || item instanceof FluxArmorItem
+                    || item instanceof FluxTridentItem || item instanceof FluxWrenchItem) {
+                event.modify(item, patch -> patch.remove(DataComponents.ATTRIBUTE_MODIFIERS));
+            }
+        });
+    }
+
     private void capSetup(RegisterCapabilitiesEvent event) {
 
         ITEMS.getRegistryObjects().values().forEach((holder) -> {
@@ -132,7 +149,7 @@ public class RedstoneArsenal {
     }
     // endregion
 
-    public static final ResourceKey<DamageType> FLUX = ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(ID_REDSTONE_ARSENAL, "flux"));
-    public static final ResourceKey<DamageType> FLUX_RANGED = ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(ID_REDSTONE_ARSENAL, "flux_ranged"));
+    public static final ResourceKey<DamageType> FLUX = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "flux"));
+    public static final ResourceKey<DamageType> FLUX_RANGED = ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "flux_ranged"));
 
 }

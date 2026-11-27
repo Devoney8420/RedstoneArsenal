@@ -1,7 +1,9 @@
 package cofh.redstonearsenal.common.entity;
 
+import cofh.lib.util.helpers.StackData;
+import net.minecraft.world.item.enchantment.Enchantments;
+import cofh.lib.util.Utils;
 import cofh.redstonearsenal.common.item.FluxTridentItem;
-import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -13,7 +15,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
@@ -42,33 +43,33 @@ public class ThrownFluxTrident extends AbstractArrow {
 
     public ThrownFluxTrident(EntityType<? extends ThrownFluxTrident> type, Level world) {
 
-        super(type, world, ItemStack.EMPTY);
+        super(type, world);
     }
 
     public ThrownFluxTrident(Level world, LivingEntity owner, ItemStack stack) {
 
-        super(FLUX_TRIDENT.get(), owner, world, stack);
+        super(FLUX_TRIDENT.get(), owner, world, stack, stack);
         this.tridentItem = stack.copy();
-        this.entityData.set(ID_LOYALTY, (byte) EnchantmentHelper.getLoyalty(stack));
+        this.entityData.set(ID_LOYALTY, (byte) Utils.getItemEnchantmentLevel(Enchantments.LOYALTY, stack));
         this.entityData.set(ID_FOIL, stack.hasFoil());
     }
 
     public ThrownFluxTrident(Level world, double x, double y, double z) {
 
-        super(FLUX_TRIDENT.get(), x, y, z, world, ItemStack.EMPTY);
+        super(FLUX_TRIDENT.get(), x, y, z, world, ItemStack.EMPTY, null);
     }
 
     @Override
-    protected void defineSynchedData() {
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
 
-        super.defineSynchedData();
-        this.entityData.define(ID_LOYALTY, (byte) 0);
-        this.entityData.define(ID_FOIL, false);
+        super.defineSynchedData(builder);
+        builder.define(ID_LOYALTY, (byte) 0);
+        builder.define(ID_FOIL, false);
     }
 
     public boolean isEmpowered() {
 
-        return ((FluxTridentItem) tridentItem.getItem()).isEmpowered(tridentItem);
+        return tridentItem.getItem() instanceof FluxTridentItem item && item.isEmpowered(tridentItem);
     }
 
     @Override
@@ -82,7 +83,7 @@ public class ThrownFluxTrident extends AbstractArrow {
         if ((this.dealtDamage || this.isNoPhysics()) && entity != null) {
             int i = this.entityData.get(ID_LOYALTY);
             if (i > 0 && !this.isAcceptableReturnOwner()) {
-                if (!this.level.isClientSide && this.pickup == AbstractArrow.Pickup.ALLOWED) {
+                if (!this.level().isClientSide && this.pickup == AbstractArrow.Pickup.ALLOWED) {
                     this.spawnAtLocation(this.getPickupItem(), 0.1F);
                 }
                 this.discard();
@@ -90,7 +91,7 @@ public class ThrownFluxTrident extends AbstractArrow {
                 this.setNoPhysics(true);
                 Vec3 vector3d = new Vec3(entity.getX() - this.getX(), entity.getEyeY() - this.getY(), entity.getZ() - this.getZ());
                 this.setPosRaw(this.getX(), this.getY() + vector3d.y * 0.015D * (double) i, this.getZ());
-                if (this.level.isClientSide) {
+                if (this.level().isClientSide) {
                     this.yOld = this.getY();
                 }
 
@@ -118,9 +119,14 @@ public class ThrownFluxTrident extends AbstractArrow {
     }
 
     @Override
-    protected ItemStack getPickupItem() {
+    protected ItemStack getDefaultPickupItem() {
 
-        return this.tridentItem.copy();
+        return new ItemStack(ITEMS.get(ID_FLUX_TRIDENT));
+    }
+
+    @Override
+    protected ItemStack getPickupItem() {
+        return tridentItem.copy();
     }
 
     public boolean isFoil() {
@@ -146,13 +152,11 @@ public class ThrownFluxTrident extends AbstractArrow {
 
         Entity entity = result.getEntity();
         float f = 8.0F;
-        if (entity instanceof LivingEntity) {
-            LivingEntity livingentity = (LivingEntity) entity;
-            f += EnchantmentHelper.getDamageBonus(this.tridentItem, livingentity.getMobType());
-        }
-
         Entity entity1 = this.getOwner();
         DamageSource damagesource = this.damageSources().trident(this, entity1 == null ? this : entity1);
+        if (level() instanceof ServerLevel serverLevel) {
+            f = EnchantmentHelper.modifyDamage(serverLevel, tridentItem, entity, damagesource, f);
+        }
         this.dealtDamage = true;
         SoundEvent soundevent = SoundEvents.TRIDENT_HIT;
         if (entity.hurt(damagesource, f)) {
@@ -161,28 +165,15 @@ public class ThrownFluxTrident extends AbstractArrow {
             }
             if (entity instanceof LivingEntity) {
                 LivingEntity livingentity1 = (LivingEntity) entity;
-                if (entity1 instanceof LivingEntity) {
-                    EnchantmentHelper.doPostHurtEffects(livingentity1, entity1);
-                    EnchantmentHelper.doPostDamageEffects((LivingEntity) entity1, livingentity1);
+                if (level() instanceof ServerLevel serverLevel) {
+                    EnchantmentHelper.doPostAttackEffectsWithItemSource(serverLevel, livingentity1, damagesource, tridentItem);
                 }
                 this.doPostHurtEffects(livingentity1);
             }
         }
 
         this.setDeltaMovement(this.getDeltaMovement().multiply(-0.01D, -0.1D, -0.01D));
-        float f1 = 1.0F;
-        if (this.level instanceof ServerLevel && this.level.isThundering() && EnchantmentHelper.hasChanneling(this.tridentItem)) {
-            BlockPos blockpos = entity.blockPosition();
-            if (this.level.canSeeSky(blockpos)) {
-                LightningBolt lightningboltentity = EntityType.LIGHTNING_BOLT.create(this.level);
-                lightningboltentity.moveTo(Vec3.atBottomCenterOf(blockpos));
-                lightningboltentity.setCause(entity1 instanceof ServerPlayer ? (ServerPlayer) entity1 : null);
-                this.level.addFreshEntity(lightningboltentity);
-                soundevent = SoundEvents.TRIDENT_THUNDER;
-                f1 = 5.0F;
-            }
-        }
-        this.playSound(soundevent, f1, 1.0F);
+        this.playSound(soundevent, 1.0F, 1.0F);
     }
 
     @Override
@@ -205,17 +196,17 @@ public class ThrownFluxTrident extends AbstractArrow {
 
         super.readAdditionalSaveData(nbt);
         if (nbt.contains("Trident", TAG_COMPOUND)) {
-            this.tridentItem = ItemStack.of(nbt.getCompound("Trident"));
+            this.tridentItem = StackData.readItem(registryAccess(), nbt.getCompound("Trident"));
         }
         this.dealtDamage = nbt.getBoolean("DealtDamage");
-        this.entityData.set(ID_LOYALTY, (byte) EnchantmentHelper.getLoyalty(this.tridentItem));
+        this.entityData.set(ID_LOYALTY, (byte) Utils.getItemEnchantmentLevel(Enchantments.LOYALTY, this.tridentItem));
     }
 
     @Override
     public void addAdditionalSaveData(CompoundTag nbt) {
 
         super.addAdditionalSaveData(nbt);
-        nbt.put("Trident", this.tridentItem.save(new CompoundTag()));
+        nbt.put("Trident", this.tridentItem.saveOptional(registryAccess()));
         nbt.putBoolean("DealtDamage", this.dealtDamage);
     }
 

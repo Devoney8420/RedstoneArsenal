@@ -9,7 +9,7 @@ import static cofh.lib.util.constants.ModIds.ID_REDSTONE_ARSENAL;
 
 public class FluxArrowRenderer extends ArrowRenderer<AbstractArrow> {
 
-    private static final ResourceLocation TEXTURE = new ResourceLocation(ID_REDSTONE_ARSENAL + ":textures/entity/flux_arrow.png");
+    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(ID_REDSTONE_ARSENAL, "textures/entity/flux_arrow.png");
 
     public FluxArrowRenderer(EntityRendererProvider.Context ctx) {
 

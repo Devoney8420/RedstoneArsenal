@@ -120,11 +120,11 @@ public class FluxShieldingHelper {
 
     protected static void onUseFluxShieldCharge(LivingEntity entity) {
 
-        entity.level.playSound(null, entity.getX(), entity.getY(), entity.getZ(), SOUND_SHIELDING_BREAK.get(), entity.getSoundSource(), 1.5F, 0.65F + MathHelper.RANDOM.nextFloat() * 0.2F);
+        entity.level().playSound(null, entity.getX(), entity.getY(), entity.getZ(), SOUND_SHIELDING_BREAK.get(), entity.getSoundSource(), 1.5F, 0.65F + MathHelper.RANDOM.nextFloat() * 0.2F);
         AABB bounds = entity.getBoundingBox();
         Vec3 pos = bounds.getCenter();
-        if (!entity.level.isClientSide) {
-            ((ServerLevel) entity.level).sendParticles(DustParticleOptions.REDSTONE, pos.x(), pos.y(), pos.z(), 20, bounds.getXsize() * 0.5 + 0.2, bounds.getYsize() * 0.5 + 0.2, bounds.getZsize() * 0.5 + 0.2, 0);
+        if (!entity.level().isClientSide) {
+            ((ServerLevel) entity.level()).sendParticles(DustParticleOptions.REDSTONE, pos.x(), pos.y(), pos.z(), 20, bounds.getXsize() * 0.5 + 0.2, bounds.getYsize() * 0.5 + 0.2, bounds.getZsize() * 0.5 + 0.2, 0);
         }
     }
 

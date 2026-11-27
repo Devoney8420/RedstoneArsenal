@@ -1,5 +1,7 @@
 package cofh.redstonearsenal.common.item;
 
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.entity.EquipmentSlotGroup;
 import cofh.core.client.particle.options.CylindricalParticleOptions;
 import cofh.core.common.config.CoreClientConfig;
 import cofh.core.common.item.ILeftClickHandlerItem;
@@ -11,8 +13,6 @@ import cofh.lib.util.Utils;
 import cofh.lib.util.helpers.MathHelper;
 import cofh.redstonearsenal.client.renderer.FluxTridentBEWLR;
 import cofh.redstonearsenal.common.entity.ThrownFluxTrident;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
@@ -28,7 +28,6 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.*;
-import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
@@ -80,9 +79,9 @@ public class FluxTridentItem extends TridentItemCoFH implements IMultiModeFluxIt
         this.extract = xfer;
         this.receive = xfer;
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("throwing"), (stack, world, entity, seed) -> entity != null && entity.isUsingItem() && entity.getUseItem().equals(stack) ? 1.0F : 0.0F);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("charged"), this::getChargedModelProperty);
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("throwing"), (stack, world, entity, seed) -> entity != null && entity.isUsingItem() && entity.getUseItem().equals(stack) ? 1.0F : 0.0F);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("charged"), this::getChargedModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     public FluxTridentItem(Tier tier, int enchantability, int attackDamageIn, float attackSpeedIn, float reachIn, Properties builder, int energy, int xfer) {
@@ -93,10 +92,10 @@ public class FluxTridentItem extends TridentItemCoFH implements IMultiModeFluxIt
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -124,7 +123,7 @@ public class FluxTridentItem extends TridentItemCoFH implements IMultiModeFluxIt
     public InteractionResultHolder<ItemStack> use(Level world, Player player, InteractionHand hand) {
 
         ItemStack stack = player.getItemInHand(hand);
-        if (hasEnergy(stack, false) && !player.isAutoSpinAttack() && (EnchantmentHelper.getRiptide(stack) <= 0 || player.isInWaterOrRain())) {
+        if (hasEnergy(stack, false) && !player.isAutoSpinAttack() && (Utils.getItemEnchantmentLevel(Enchantments.RIPTIDE, stack) <= 0 || player.isInWaterOrRain())) {
             player.startUsingItem(hand);
             return InteractionResultHolder.consume(stack);
         }
@@ -135,45 +134,45 @@ public class FluxTridentItem extends TridentItemCoFH implements IMultiModeFluxIt
     public void releaseUsing(ItemStack stack, Level world, LivingEntity entity, int remainingDuration) {
 
         if (entity instanceof Player player) {
-            int i = this.getUseDuration(stack) - remainingDuration;
+            int i = this.getUseDuration(stack, entity) - remainingDuration;
             if (i >= 10) {
-                int riptideLevel = EnchantmentHelper.getRiptide(stack);
+                int riptideLevel = Utils.getItemEnchantmentLevel(Enchantments.RIPTIDE, stack);
                 if (riptideLevel <= 0 || player.isInWaterOrRain()) {
-                    if (!world.isClientSide && useEnergy(stack, false, player.abilities.instabuild)) {
+                    if (!world.isClientSide && useEnergy(stack, false, player.getAbilities().instabuild)) {
                         if (riptideLevel == 0) {
                             ThrownFluxTrident tridentEntity = new ThrownFluxTrident(world, player, stack);
-                            tridentEntity.shootFromRotation(player, player.xRot, player.yRot, 0.0F, 2.5F + riptideLevel * 0.5F, 1.0F);
-                            if (player.abilities.instabuild) {
+                            tridentEntity.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, 2.5F + riptideLevel * 0.5F, 1.0F);
+                            if (player.getAbilities().instabuild) {
                                 tridentEntity.pickup = AbstractArrow.Pickup.CREATIVE_ONLY;
                             }
                             world.addFreshEntity(tridentEntity);
-                            world.playSound(null, tridentEntity, SoundEvents.TRIDENT_THROW, SoundSource.PLAYERS, 1.0F, 1.0F);
-                            if (!player.abilities.instabuild) {
-                                player.inventory.removeItem(stack);
+                            world.playSound(null, tridentEntity, SoundEvents.TRIDENT_THROW.value(), SoundSource.PLAYERS, 1.0F, 1.0F);
+                            if (!player.getAbilities().instabuild) {
+                                player.getInventory().removeItem(stack);
                             }
                         }
                     }
                     player.awardStat(Stats.ITEM_USED.get(this));
                     if (riptideLevel > 0) {
                         float degToRad = (float) Math.PI / 180F;
-                        float xRotRad = player.xRot * degToRad;
-                        float yRotRad = player.yRot * degToRad;
+                        float xRotRad = player.getXRot() * degToRad;
+                        float yRotRad = player.getYRot() * degToRad;
                         float xPush = -MathHelper.sin(yRotRad) * MathHelper.cos(xRotRad);
                         float yPush = -MathHelper.sin(xRotRad);
                         float zPush = MathHelper.cos(yRotRad) * MathHelper.cos(xRotRad);
                         float riptideMult = (1.0F + riptideLevel) * 0.75F / MathHelper.sqrt(xPush * xPush + yPush * yPush + zPush * zPush);
                         player.push(xPush * riptideMult, yPush * riptideMult, zPush * riptideMult);
-                        player.startAutoSpinAttack(20);
+                        player.startAutoSpinAttack(20, 8.0F, stack);
                         if (player.onGround()) {
                             player.move(MoverType.SELF, new Vec3(0.0D, 1.1999999, 0.0D));
                         }
                         SoundEvent soundevent;
                         if (riptideLevel >= 3) {
-                            soundevent = SoundEvents.TRIDENT_RIPTIDE_3;
+                            soundevent = SoundEvents.TRIDENT_RIPTIDE_3.value();
                         } else if (riptideLevel == 2) {
-                            soundevent = SoundEvents.TRIDENT_RIPTIDE_2;
+                            soundevent = SoundEvents.TRIDENT_RIPTIDE_2.value();
                         } else {
-                            soundevent = SoundEvents.TRIDENT_RIPTIDE_1;
+                            soundevent = SoundEvents.TRIDENT_RIPTIDE_1.value();
                         }
                         world.playSound(null, player, soundevent, SoundSource.PLAYERS, 1.0F, 1.0F);
                     }
@@ -193,15 +192,15 @@ public class FluxTridentItem extends TridentItemCoFH implements IMultiModeFluxIt
         return false;
     }
 
-    public boolean startPlunge(LivingEntity living) {
+    public boolean startPlunge(LivingEntity living, ItemStack stack) {
 
         if (!canStartPlunging(living)) {
             return false;
         }
         if (living instanceof Player player) {
             player.stopFallFlying();
-            player.abilities.flying = false;
-            player.startAutoSpinAttack(200);
+            player.getAbilities().flying = false;
+            player.startAutoSpinAttack(200, 0.0F, stack);
         }
         Vec3 motion = getPlungeVector(living.getLookAngle(), getPlungeSpeed());
         living.push(motion.x(), motion.y(), motion.z());
@@ -214,7 +213,7 @@ public class FluxTridentItem extends TridentItemCoFH implements IMultiModeFluxIt
             return false;
         }
         ClipContext context = new ClipContext(living.position(), living.position().add(0, -3, 0), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, living);
-        return living.level.clip(context).getType().equals(HitResult.Type.MISS);
+        return living.level().clip(context).getType().equals(HitResult.Type.MISS);
     }
 
     public boolean plungeAttack(Level world, LivingEntity attacker, ItemStack stack) {
@@ -230,7 +229,7 @@ public class FluxTridentItem extends TridentItemCoFH implements IMultiModeFluxIt
         }
         if (Utils.getItemEnchantmentLevel(Enchantments.CHANNELING, stack) > 0) {
             if (world.canSeeSky(attacker.blockPosition()) && world instanceof ServerLevel && world.isThundering()) {
-                attacker.addEffect(new MobEffectInstance(LIGHTNING_RESISTANCE.get(), 40, 0, false, false));
+                attacker.addEffect(new MobEffectInstance(LIGHTNING_RESISTANCE, 40, 0, false, false));
                 Utils.spawnLightningBolt(world, attacker.blockPosition(), attacker);
             }
         }
@@ -292,15 +291,13 @@ public class FluxTridentItem extends TridentItemCoFH implements IMultiModeFluxIt
     }
 
     @Override
-    public Multimap<Attribute, AttributeModifier> getAttributeModifiers(EquipmentSlot slot, ItemStack stack) {
+    public ItemAttributeModifiers getDefaultAttributeModifiers(ItemStack stack) {
 
-        Multimap<Attribute, AttributeModifier> multimap = HashMultimap.create();
-        if (slot == EquipmentSlot.MAINHAND) {
-            multimap.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_UUID, "Weapon modifier", getAttackDamage(stack), AttributeModifier.Operation.ADDITION));
-            multimap.put(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_UUID, "Weapon modifier", getAttackSpeed(stack), AttributeModifier.Operation.ADDITION));
-            multimap.put(NeoForgeMod.ENTITY_REACH.value(), new AttributeModifier(UUID_WEAPON_RANGE, "Weapon modifier", getAddedAttackRange(stack), AttributeModifier.Operation.ADDITION));
-        }
-        return multimap;
+        return ItemAttributeModifiers.builder()
+                .add(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_ID, getAttackDamage(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .add(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_ID, getAttackSpeed(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .add(Attributes.ENTITY_INTERACTION_RANGE, new AttributeModifier(ResourceLocation.fromNamespaceAndPath("redstone_arsenal", "weapon_reach"), getAddedAttackRange(stack), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.MAINHAND)
+                .build();
     }
 
     protected float getAttackDamage(ItemStack stack) {
@@ -392,7 +389,7 @@ public class FluxTridentItem extends TridentItemCoFH implements IMultiModeFluxIt
     public void onLeftClick(Player player, ItemStack stack) {
 
         if (isEmpowered(stack) && hasEnergy(stack, true)) {
-            startPlunge(player);
+            startPlunge(player, stack);
         }
     }
     // endregion

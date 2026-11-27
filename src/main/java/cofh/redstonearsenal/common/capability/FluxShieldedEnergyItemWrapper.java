@@ -1,5 +1,7 @@
 package cofh.redstonearsenal.common.capability;
 
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.core.component.DataComponents;
 import cofh.lib.api.item.IEnergyContainerItem;
 import cofh.lib.common.energy.EnergyContainerItemWrapper;
 import cofh.lib.util.Utils;
@@ -33,7 +35,7 @@ public class FluxShieldedEnergyItemWrapper extends EnergyContainerItemWrapper im
     @Override
     public int curCharges(LivingEntity entity) {
 
-        CompoundTag nbt = shieldedItem.getOrCreateTag();
+        CompoundTag nbt = shieldedItem.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         if (energyPerUse > 0 && getEnergyStored() < energyPerUse) {
             return 0;
         }
@@ -44,7 +46,7 @@ public class FluxShieldedEnergyItemWrapper extends EnergyContainerItemWrapper im
             }
             availableTime = nbt.getLong(TAG_FLUX_SHIELD);
         }
-        return entity.level.getGameTime() >= availableTime ? 1 : 0;
+        return entity.level().getGameTime() >= availableTime ? 1 : 0;
     }
 
     @Override
@@ -59,8 +61,8 @@ public class FluxShieldedEnergyItemWrapper extends EnergyContainerItemWrapper im
         if (curCharges(entity) < 1 || (energyPerUse > 0 && getEnergyStored() >= energyPerUse && extractEnergy(energyPerUse, Utils.isCreativePlayer(entity)) != energyPerUse)) {
             return false;
         }
-        availableTime = entity.level.getGameTime() + COOLDOWN;
-        shieldedItem.getOrCreateTag().putLong(TAG_FLUX_SHIELD, availableTime);
+        availableTime = entity.level().getGameTime() + COOLDOWN;
+        CustomData.update(DataComponents.CUSTOM_DATA, shieldedItem, tag -> tag.putLong(TAG_FLUX_SHIELD, availableTime));
         return true;
     }
 

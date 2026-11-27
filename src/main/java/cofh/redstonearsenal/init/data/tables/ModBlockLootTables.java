@@ -1,12 +1,18 @@
 package cofh.redstonearsenal.init.data.tables;
 
 import cofh.lib.init.data.loot.BlockLootSubProviderCoFH;
+import net.minecraft.core.HolderLookup;
 
 import static cofh.redstonearsenal.RedstoneArsenal.BLOCKS;
 import static cofh.redstonearsenal.init.registries.ModIDs.ID_FLUX_GEM_BLOCK;
 import static cofh.redstonearsenal.init.registries.ModIDs.ID_FLUX_METAL_BLOCK;
 
 public class ModBlockLootTables extends BlockLootSubProviderCoFH {
+
+    public ModBlockLootTables(HolderLookup.Provider registries) {
+        super(registries);
+    }
+
 
     @Override
     protected void generate() {

@@ -1,5 +1,7 @@
 package cofh.redstonearsenal.common.item;
 
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.core.component.DataComponents;
 import cofh.core.common.config.CoreClientConfig;
 import cofh.core.util.ProxyUtils;
 import cofh.lib.util.Utils;
@@ -15,7 +17,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ArmorMaterial;
+import cofh.lib.common.item.ArmorMaterialCoFH;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
@@ -33,18 +35,18 @@ public class FluxElytraItem extends FluxArmorItem implements IMultiModeFluxItem 
     public int boostTime = 32;
     public int energyUseInterval = 8;
 
-    public FluxElytraItem(ArmorMaterial pMaterial, ArmorItem.Type pType, Properties pProperties, int maxEnergy, int maxTransfer) {
+    public FluxElytraItem(ArmorMaterialCoFH pMaterial, ArmorItem.Type pType, Properties pProperties, int maxEnergy, int maxTransfer) {
 
         super(pMaterial, pType, pProperties, maxEnergy, maxTransfer);
 
-        ProxyUtils.registerItemModelProperty(this, new ResourceLocation("empowered"), this::getEmpoweredModelProperty);
+        ProxyUtils.registerItemModelProperty(this, ResourceLocation.parse("empowered"), this::getEmpoweredModelProperty);
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level worldIn, List<Component> tooltip, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flagIn) {
 
         if (Screen.hasShiftDown() || CoreClientConfig.alwaysShowDetails.get()) {
-            tooltipDelegate(stack, worldIn, tooltip, flagIn);
+            tooltipDelegate(stack, context.level(), tooltip, flagIn);
         } else if (CoreClientConfig.holdShiftForDetails.get()) {
             tooltip.add(getTextComponent("info.cofh.hold_shift_for_details").withStyle(ChatFormatting.GRAY));
         }
@@ -66,15 +68,15 @@ public class FluxElytraItem extends FluxArmorItem implements IMultiModeFluxItem 
         }
 
         if (entity.isShiftKeyDown() && useEnergy(stack, true, simulate)) {
-            stack.getOrCreateTag().remove(NBTTags.TAG_TIME);
+            clearBoostTime(stack);
             brake(entity);
         } else {
-            CompoundTag tag = stack.getOrCreateTag();
-            long time = entity.level.getGameTime();
-            if (time - tag.getLong(NBTTags.TAG_TIME) <= boostTime) {
+            CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+            long time = entity.level().getGameTime();
+            if (tag.contains(NBTTags.TAG_TIME) && time - tag.getLong(NBTTags.TAG_TIME) <= boostTime) {
                 propel(entity);
             } else if (isEmpowered(stack) && useEnergy(stack, true, isCreative)) {
-                tag.putLong(NBTTags.TAG_TIME, time);
+                CustomData.update(DataComponents.CUSTOM_DATA, stack, data -> data.putLong(NBTTags.TAG_TIME, time));
                 propel(entity);
             }
         }
@@ -86,7 +88,14 @@ public class FluxElytraItem extends FluxArmorItem implements IMultiModeFluxItem 
     public void inventoryTick(ItemStack stack, Level world, Entity entity, int slot, boolean selected) {
 
         if (entity instanceof LivingEntity && !((LivingEntity) entity).isFallFlying()) {
-            stack.getOrCreateTag().remove(NBTTags.TAG_TIME);
+            clearBoostTime(stack);
+        }
+    }
+
+    private void clearBoostTime(ItemStack stack) {
+
+        if (stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).contains(NBTTags.TAG_TIME)) {
+            CustomData.update(DataComponents.CUSTOM_DATA, stack, tag -> tag.remove(NBTTags.TAG_TIME));
         }
     }
 
@@ -97,7 +106,7 @@ public class FluxElytraItem extends FluxArmorItem implements IMultiModeFluxItem 
             return false;
         }
         boolean isPlayer = entity instanceof Player;
-        boolean isCreative = isPlayer && ((Player) entity).abilities.instabuild;
+        boolean isCreative = isPlayer && ((Player) entity).getAbilities().instabuild;
         if (!useEnergy(stack, getEnergyPerUse(true) * time / energyUseInterval, isCreative)) {
             return false;
         }
@@ -105,7 +114,7 @@ public class FluxElytraItem extends FluxArmorItem implements IMultiModeFluxItem 
             ((Player) entity).startFallFlying();
         }
         propel(entity, propelSpeed);
-        stack.getOrCreateTag().putLong(NBTTags.TAG_TIME, entity.level.getGameTime());
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, data -> data.putLong(NBTTags.TAG_TIME, entity.level().getGameTime()));
 
         return true;
     }
@@ -122,8 +131,8 @@ public class FluxElytraItem extends FluxArmorItem implements IMultiModeFluxItem 
             Vec3 velocity = entity.getDeltaMovement();
             entity.setDeltaMovement(velocity.add(look.x * speed - velocity.x * 0.5, look.y * speed - velocity.y * 0.5, look.z * speed - velocity.z * 0.5));
 
-            if (entity.level.isClientSide()) {
-                entity.level.addParticle(DustParticleOptions.REDSTONE, entity.getX(), entity.getY(), entity.getZ(), 0, 0, 0);
+            if (entity.level().isClientSide()) {
+                entity.level().addParticle(DustParticleOptions.REDSTONE, entity.getX(), entity.getY(), entity.getZ(), 0, 0, 0);
             }
         }
     }
